@@ -5,9 +5,7 @@ import { AuthProvider } from './lib/auth';
 import { LoginPage } from './pages/LoginPage';
 import { OtpVerifyPage } from './pages/OtpVerifyPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { CategoryBrandPage } from './pages/buyback/CategoryBrandPage';
-import { DeviceIdentifierPage } from './pages/buyback/DeviceIdentifierPage';
-import { ProductInfoPage } from './pages/buyback/ProductInfoPage';
+import { NewBuybackPage } from './pages/buyback/NewBuybackPage';
 import { AssessmentMethodPage } from './pages/buyback/AssessmentMethodPage';
 import { QuestionnairePage } from './pages/buyback/QuestionnairePage';
 import { ImageAssessmentPage } from './pages/buyback/ImageAssessmentPage';
@@ -40,23 +38,15 @@ function App() {
             path="/buyback/new"
             element={
               <ProtectedRoute>
-                <CategoryBrandPage />
+                <NewBuybackPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/buyback/:id/device"
+            path="/buyback/new/:id"
             element={
               <ProtectedRoute>
-                <DeviceIdentifierPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/product"
-            element={
-              <ProtectedRoute>
-                <ProductInfoPage />
+                <NewBuybackPage />
               </ProtectedRoute>
             }
           />

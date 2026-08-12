@@ -26,8 +26,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const RESUME_ROUTE: Record<string, (id: string) => string> = {
-  draft: (id) => `/buyback/${id}/device`,
-  device_captured: (id) => `/buyback/${id}/product`,
+  draft: (id) => `/buyback/new/${id}`,
+  device_captured: (id) => `/buyback/new/${id}`,
   product_selected: (id) => `/buyback/${id}/assessment`,
   assessment_completed: (id) => `/buyback/${id}/valuation`,
   valuation_ready: (id) => `/buyback/${id}/valuation`,
