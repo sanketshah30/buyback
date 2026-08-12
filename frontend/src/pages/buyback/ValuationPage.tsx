@@ -61,7 +61,7 @@ export function ValuationPage() {
 
   return (
     <PageShell title="Estimated value" subtitle={`Buyback ID: ${data.displayId ?? '—'}`}>
-      <ProgressSteps current={6} total={10} />
+      <ProgressSteps current={4} total={7} />
 
       <div className="value-hero">
         <span className="value-hero__label">Max value</span>

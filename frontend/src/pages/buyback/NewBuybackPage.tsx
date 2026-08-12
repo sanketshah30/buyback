@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AccordionSection } from '../../components/ui/AccordionSection';
 import { Banner } from '../../components/ui/Banner';
@@ -50,6 +50,7 @@ export function NewBuybackPage() {
 
   // Section 2: device identifier
   const [deviceValue, setDeviceValue] = useState('');
+  const [deviceSaved, setDeviceSaved] = useState(false);
 
   // Section 3: product details
   const [models, setModels] = useState<Model[]>([]);
@@ -60,8 +61,9 @@ export function NewBuybackPage() {
   const [submittingSection, setSubmittingSection] = useState<SectionKey | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const categoryLockRef = useRef(false);
-  const deviceLockRef = useRef(false);
+  const isCategorySaved = Boolean(buybackId);
+  const isEditingCategory = activeSection === 'category' && isCategorySaved;
+  const isEditingDevice = activeSection === 'device' && deviceSaved;
 
   useEffect(() => {
     catalogApi.listCategories().then(setCategories);
@@ -71,15 +73,14 @@ export function NewBuybackPage() {
   useEffect(() => {
     if (!resumeId || !existing) return;
     setBuybackId(existing.id);
-    categoryLockRef.current = true;
     if (existing.category) {
       setCategoryId(existing.category.id);
       setCategoryType(existing.category.type);
     }
     if (existing.brand) setBrandId(existing.brand.id);
     if (existing.identifier) {
-      deviceLockRef.current = true;
       setDeviceValue(existing.identifier.value);
+      setDeviceSaved(true);
       setActiveSection('product');
     } else {
       setActiveSection('device');
@@ -112,24 +113,26 @@ export function NewBuybackPage() {
   }, [modelId]);
 
   const submitCategory = async () => {
-    if (!categoryId || !brandId || categoryLockRef.current) return;
-    categoryLockRef.current = true;
+    if (!categoryId || !brandId) return;
     setSubmittingSection('category');
     setError(null);
     try {
-      const request = await buybackApi.create(categoryId, brandId);
-      setBuybackId(request.id);
+      const request = buybackId
+        ? await buybackApi.updateCategory(buybackId, categoryId, brandId)
+        : await buybackApi.create(categoryId, brandId);
+      if (!buybackId) setBuybackId(request.id);
       setCategoryType(request.category?.type);
       setActiveSection('device');
     } catch (err) {
-      categoryLockRef.current = false;
-      setError(err instanceof ApiError ? err.message : 'Failed to start buyback request');
+      setError(err instanceof ApiError ? err.message : 'Failed to save category & brand');
     } finally {
       setSubmittingSection(null);
     }
   };
 
-  // Section 1 auto-advances the moment both category and brand are picked - no extra click needed.
+  // Section 1 auto-advances the moment both category and brand are first picked - no
+  // extra click needed. When re-editing an already-saved section, an explicit "Save
+  // changes" button is shown instead (see below), so this only fires for a fresh pick.
   useEffect(() => {
     if (activeSection !== 'category' || buybackId) return;
     if (!categoryId || !brandId) return;
@@ -138,15 +141,14 @@ export function NewBuybackPage() {
   }, [categoryId, brandId, activeSection, buybackId]);
 
   const submitDevice = async () => {
-    if (!buybackId || deviceLockRef.current) return;
-    deviceLockRef.current = true;
+    if (!buybackId || !deviceValid) return;
     setSubmittingSection('device');
     setError(null);
     try {
       await buybackApi.setDevice(buybackId, deviceValue);
+      setDeviceSaved(true);
       setActiveSection('product');
     } catch (err) {
-      deviceLockRef.current = false;
       setError(err instanceof ApiError ? err.message : 'Failed to save device details');
     } finally {
       setSubmittingSection(null);
@@ -156,15 +158,16 @@ export function NewBuybackPage() {
   const isSmartphone = categoryType === 'smartphone';
   const deviceValid = isSmartphone ? /^\d{16}$/.test(deviceValue) : /^[a-zA-Z0-9]{12,16}$/.test(deviceValue);
 
-  // Section 2 auto-advances a moment after a valid IMEI/serial is entered - no extra click needed.
+  // Section 2 auto-advances a moment after a valid IMEI/serial is first entered - no
+  // extra click needed. Re-editing an already-saved value uses the explicit button instead.
   useEffect(() => {
-    if (activeSection !== 'device' || !buybackId || !deviceValid) return;
+    if (activeSection !== 'device' || !buybackId || deviceSaved || !deviceValid) return;
     const timer = setTimeout(() => {
       submitDevice();
     }, DEVICE_SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deviceValue, deviceValid, activeSection, buybackId]);
+  }, [deviceValue, deviceValid, activeSection, buybackId, deviceSaved]);
 
   if (resumeId && (loadingExisting || !hydrated)) {
     return (
@@ -174,8 +177,9 @@ export function NewBuybackPage() {
     );
   }
 
-  const categoryDone = Boolean(buybackId);
-  const deviceDone = categoryDone && activeSection === 'product';
+  const categoryStatus = isCategorySaved && activeSection !== 'category' ? 'done' : activeSection === 'category' ? 'active' : 'pending';
+  const deviceStatus = deviceSaved && activeSection !== 'device' ? 'done' : activeSection === 'device' ? 'active' : 'pending';
+  const productStatus = activeSection === 'product' ? 'active' : 'pending';
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const selectedBrand = brands.find((b) => b.id === brandId);
@@ -184,6 +188,27 @@ export function NewBuybackPage() {
 
   const handleScanSimulate = () => {
     setDeviceValue(isSmartphone ? randomDigits(16) : randomSerial(14));
+  };
+
+  // Reopening an earlier, already-saved section for editing clears whatever was
+  // captured after it, since that data may no longer be valid (e.g. a different
+  // category changes the IMEI/serial format and the available models/SKUs).
+  const handleEditCategory = () => {
+    if (activeSection === 'category') return;
+    setError(null);
+    setDeviceValue('');
+    setDeviceSaved(false);
+    setModelId('');
+    setSkuId('');
+    setActiveSection('category');
+  };
+
+  const handleEditDevice = () => {
+    if (activeSection === 'device') return;
+    setError(null);
+    setModelId('');
+    setSkuId('');
+    setActiveSection('device');
   };
 
   const handleContinueProduct = async () => {
@@ -200,8 +225,6 @@ export function NewBuybackPage() {
     }
   };
 
-  const currentStep = activeSection === 'category' ? 1 : activeSection === 'device' ? 2 : 3;
-
   return (
     <PageShell
       title="Start a new buyback"
@@ -217,14 +240,15 @@ export function NewBuybackPage() {
         ) : undefined
       }
     >
-      <ProgressSteps current={currentStep} total={10} />
+      <ProgressSteps current={1} total={7} />
 
       <div className="field-group">
         <AccordionSection
           index={1}
           title="Category & brand"
-          status={categoryDone ? 'done' : activeSection === 'category' ? 'active' : 'pending'}
+          status={categoryStatus}
           summary={selectedCategory && selectedBrand ? `${selectedCategory.name} · ${selectedBrand.name}` : undefined}
+          onEdit={handleEditCategory}
         >
           <Select
             label="Category"
@@ -244,22 +268,26 @@ export function NewBuybackPage() {
             disabled={!categoryId}
             options={brands.map((b) => ({ value: b.id, label: b.name }))}
           />
-          {submittingSection === 'category' && <p className="accordion-inline-status">Starting your buyback…</p>}
-          {error && activeSection === 'category' && (
-            <Banner tone="error">
-              {error}{' '}
-              <button type="button" className="accordion-retry-link" onClick={submitCategory}>
-                Try again
-              </button>
-            </Banner>
+          {isEditingCategory ? (
+            <Button
+              onClick={submitCategory}
+              loading={submittingSection === 'category'}
+              disabled={!categoryId || !brandId}
+            >
+              Save changes
+            </Button>
+          ) : (
+            submittingSection === 'category' && <p className="accordion-inline-status">Starting your buyback…</p>
           )}
+          {error && activeSection === 'category' && <Banner tone="error">{error}</Banner>}
         </AccordionSection>
 
         <AccordionSection
           index={2}
           title={isSmartphone ? 'IMEI number' : 'Serial number'}
-          status={deviceDone ? 'done' : activeSection === 'device' ? 'active' : 'pending'}
-          summary={deviceDone ? deviceValue : undefined}
+          status={deviceStatus}
+          summary={deviceSaved ? deviceValue : undefined}
+          onEdit={handleEditDevice}
         >
           <TextField
             label={isSmartphone ? 'IMEI (16 digits)' : 'Serial number (12-16 characters)'}
@@ -288,21 +316,20 @@ export function NewBuybackPage() {
               ? 'Dial *#06# on the device to find the IMEI, or scan the barcode on the box/SIM tray.'
               : 'The serial number is usually printed on the underside of the device or inside the battery compartment.'}
           </Banner>
-          {submittingSection === 'device' && <p className="accordion-inline-status">Saving…</p>}
-          {error && activeSection === 'device' && (
-            <Banner tone="error">
-              {error}{' '}
-              <button type="button" className="accordion-retry-link" onClick={submitDevice}>
-                Try again
-              </button>
-            </Banner>
+          {isEditingDevice ? (
+            <Button onClick={submitDevice} loading={submittingSection === 'device'} disabled={!deviceValid}>
+              Save changes
+            </Button>
+          ) : (
+            submittingSection === 'device' && <p className="accordion-inline-status">Saving…</p>
           )}
+          {error && activeSection === 'device' && <Banner tone="error">{error}</Banner>}
         </AccordionSection>
 
         <AccordionSection
           index={3}
           title="Product information"
-          status={activeSection === 'product' ? 'active' : 'pending'}
+          status={productStatus}
           summary={selectedModel && selectedSku ? `${selectedModel.name} · ${selectedSku.label}` : undefined}
         >
           <label className="text-field">

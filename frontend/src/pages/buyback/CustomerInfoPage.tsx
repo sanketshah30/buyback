@@ -69,7 +69,7 @@ export function CustomerInfoPage() {
         </>
       }
     >
-      <ProgressSteps current={8} total={10} />
+      <ProgressSteps current={5} total={7} />
 
       <div className="value-hero" style={{ paddingTop: 12, paddingBottom: 0 }}>
         <span className="value-hero__label">Final value</span>

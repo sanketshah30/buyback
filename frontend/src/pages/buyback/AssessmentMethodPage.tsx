@@ -32,7 +32,7 @@ export function AssessmentMethodPage() {
 
   return (
     <PageShell title="Physical assessment" subtitle="Choose how you'd like to assess your device's condition">
-      <ProgressSteps current={4} total={10} />
+      <ProgressSteps current={2} total={7} />
 
       <div className="field-group">
         {METHODS.map(({ id: methodId, title, description, Icon }) => (

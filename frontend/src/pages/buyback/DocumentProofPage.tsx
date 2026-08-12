@@ -70,7 +70,7 @@ export function DocumentProofPage() {
         </>
       }
     >
-      <ProgressSteps current={9} total={10} />
+      <ProgressSteps current={6} total={7} />
 
       <section>
         <h3 className="section-label">Document proof</h3>

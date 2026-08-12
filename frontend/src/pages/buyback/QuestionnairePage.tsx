@@ -63,7 +63,7 @@ export function QuestionnairePage() {
         </>
       }
     >
-      <ProgressSteps current={5} total={10} />
+      <ProgressSteps current={3} total={7} />
 
       <div className="field-group">
         {questions.map((question) => {

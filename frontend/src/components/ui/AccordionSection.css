@@ -23,6 +23,28 @@
   padding: 16px 18px;
 }
 
+.accordion-section__header--editable {
+  cursor: pointer;
+}
+
+.accordion-section__header--editable:hover,
+.accordion-section__header--editable:focus-visible {
+  background: var(--color-surface-raised);
+  outline: none;
+}
+
+.accordion-section__edit {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.accordion-section__header--editable:hover .accordion-section__edit,
+.accordion-section__header--editable:focus-visible .accordion-section__edit {
+  color: var(--color-gold);
+}
+
 .accordion-section__index {
   flex-shrink: 0;
   width: 28px;

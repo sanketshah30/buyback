@@ -46,7 +46,7 @@ export function DiagnosisPage() {
 
   return (
     <PageShell title="Diagnosis" subtitle="Scan the QR code on your device to run the diagnosis">
-      <ProgressSteps current={7} total={10} />
+      <ProgressSteps current={4} total={7} />
 
       <div className="diagnosis-centered">
         {!isCompleted && data.diagnosis && (

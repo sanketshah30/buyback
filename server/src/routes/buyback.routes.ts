@@ -72,6 +72,40 @@ buybackRouter.get('/:id', async (req: AuthedRequest, res, next) => {
   }
 });
 
+buybackRouter.patch('/:id/category', async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    if (request.status === 'confirmed') {
+      return res.status(400).json({ error: 'A confirmed buyback request cannot be edited' });
+    }
+
+    const { categoryId, brandId } = req.body as { categoryId?: string; brandId?: string };
+    if (!categoryId || !brandId) {
+      return res.status(400).json({ error: 'categoryId and brandId are required' });
+    }
+    const category = await catalogRepository.getCategory(categoryId);
+    const brand = await catalogRepository.getBrand(brandId);
+    if (!category || !brand) {
+      return res.status(404).json({ error: 'Unknown category or brand' });
+    }
+
+    // Changing category/brand can invalidate everything captured after it
+    // (the identifier format depends on category type, and models/SKUs are
+    // scoped to the previous brand), so downstream fields are cleared.
+    const updated = await buybackRepository.update(request.id, {
+      category,
+      brand,
+      identifier: undefined,
+      model: undefined,
+      sku: undefined,
+      status: 'draft',
+    });
+    return res.json(updated);
+  } catch (err) {
+    return next(err);
+  }
+});
+
 buybackRouter.patch('/:id/device', async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);

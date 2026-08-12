@@ -43,7 +43,7 @@ export function VideoAssessmentPage() {
         </>
       }
     >
-      <ProgressSteps current={5} total={10} />
+      <ProgressSteps current={3} total={7} />
 
       {permissionState !== 'granted' && (
         <Banner tone="warning">

@@ -12,6 +12,8 @@ export const buybackApi = {
   get: (id: string) => api.get<BuybackRequest>(`/api/buyback/${id}`),
   create: (categoryId: string, brandId: string) =>
     api.post<BuybackRequest>('/api/buyback', { categoryId, brandId }),
+  updateCategory: (id: string, categoryId: string, brandId: string) =>
+    api.patch<BuybackRequest>(`/api/buyback/${id}/category`, { categoryId, brandId }),
   setDevice: (id: string, value: string) =>
     api.patch<BuybackRequest>(`/api/buyback/${id}/device`, { value }),
   setProduct: (id: string, modelId: string, skuId: string) =>
