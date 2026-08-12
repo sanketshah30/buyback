@@ -33,5 +33,35 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Proxy API calls through the Vite dev server itself so the frontend
+    // always talks to the backend on the *same* origin the browser loaded
+    // the page from (this also matters when the app is viewed through a
+    // forwarded/tunneled preview URL instead of literally "localhost" -
+    // hardcoding an absolute http://localhost:4000 URL would otherwise
+    // resolve to the viewer's own machine, causing "Failed to fetch").
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    host: true,
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
   },
 });

@@ -13,7 +13,13 @@ export function createApp() {
   const app = express();
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
-  app.use(cors({ origin: env.clientOrigin, credentials: true }));
+  // In development, reflect whatever origin the request came from (rather than a
+  // single hardcoded CLIENT_ORIGIN) so the app also works when previewed through a
+  // forwarded/tunneled URL whose host isn't known ahead of time. The frontend's Vite
+  // dev server proxy (see frontend/vite.config.ts) avoids cross-origin calls entirely
+  // for local development, but this keeps direct API access (curl, Postman, a
+  // separately-hosted frontend) working too.
+  app.use(cors({ origin: env.nodeEnv === 'development' ? true : env.clientOrigin, credentials: true }));
   app.use(express.json({ limit: '10mb' }));
   app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined'));
 

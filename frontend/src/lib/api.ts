@@ -1,4 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+// Empty string = relative requests, which go through the Vite dev/preview
+// server proxy (see vite.config.ts) so the app always calls the API on the
+// same origin the page was loaded from.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const TOKEN_STORAGE_KEY = 'buyback.token';
 
 export class ApiError extends Error {

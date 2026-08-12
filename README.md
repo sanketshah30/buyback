@@ -17,7 +17,11 @@ npm run dev:server     # http://localhost:4000
 npm run dev:frontend   # http://localhost:5173 (in a second terminal)
 ```
 
-The frontend talks to the API via `VITE_API_BASE_URL` (see `frontend/.env`). Login with any 10-digit mobile number - OTPs are mocked and always `123456` (also echoed back in the UI/response as `devOtp` since there's no real SMS/email gateway wired up yet).
+Login with any 10-digit mobile number - OTPs are mocked and always `123456` (also echoed back in the UI/response as `devOtp` since there's no real SMS/email gateway wired up yet).
+
+### Networking: how the frontend reaches the API
+
+By default `frontend/.env` leaves `VITE_API_BASE_URL` empty, so all `/api/*` and `/uploads/*` calls are made **relative to whatever origin the page was loaded from**, and `frontend/vite.config.ts` proxies those paths to the backend (`http://localhost:4000` by default, override with `VITE_API_PROXY_TARGET`). This matters if you're viewing the frontend through a forwarded/tunneled preview URL rather than literally `http://localhost:5173` - hardcoding an absolute `http://localhost:4000` URL would otherwise resolve to *your own machine* from the browser's perspective and fail with "Failed to fetch". Only set `VITE_API_BASE_URL` to an absolute URL if you're serving the frontend separately from this proxy (e.g. a static production build hosted elsewhere) and need to point it at a specific backend host.
 
 ## Why mock data?
 
