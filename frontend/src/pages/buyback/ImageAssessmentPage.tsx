@@ -59,7 +59,7 @@ export function ImageAssessmentPage() {
         </>
       }
     >
-      <ProgressSteps current={5} total={12} />
+      <ProgressSteps current={5} total={10} />
 
       {permissionState !== 'granted' && (
         <Banner tone="warning">

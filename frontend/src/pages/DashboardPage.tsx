@@ -34,9 +34,9 @@ const RESUME_ROUTE: Record<string, (id: string) => string> = {
   diagnosis_pending: (id) => `/buyback/${id}/diagnosis`,
   diagnosis_completed: (id) => `/buyback/${id}/diagnosis`,
   value_finalized: (id) => `/buyback/${id}/customer`,
-  customer_info_pending: (id) => `/buyback/${id}/customer-otp`,
+  customer_info_pending: (id) => `/buyback/${id}/customer`,
   otp_verified: (id) => `/buyback/${id}/document`,
-  document_uploaded: (id) => `/buyback/${id}/product-images`,
+  document_uploaded: (id) => `/buyback/${id}/document`,
   product_images_uploaded: (id) => `/buyback/${id}/review`,
 };
 

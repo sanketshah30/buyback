@@ -38,3 +38,22 @@
   color: var(--color-danger);
   font-size: 0.8rem;
 }
+
+.text-field__icon-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-gold-dim);
+  color: var(--color-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.text-field__icon-btn:active {
+  background: rgba(212, 175, 55, 0.3);
+}

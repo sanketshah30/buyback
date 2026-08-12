@@ -54,7 +54,7 @@ export function ReviewPage() {
         </>
       }
     >
-      <ProgressSteps current={12} total={12} />
+      <ProgressSteps current={10} total={10} />
 
       <section>
         <h3 className="section-label">Product details</h3>

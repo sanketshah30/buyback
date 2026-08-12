@@ -4,6 +4,7 @@ import { Banner } from '../../components/ui/Banner';
 import { Button } from '../../components/ui/Button';
 import { PageShell } from '../../components/ui/PageShell';
 import { ProgressSteps } from '../../components/ui/ProgressSteps';
+import { Select } from '../../components/ui/Select';
 import { Spinner } from '../../components/ui/Spinner';
 import { useBuyback } from '../../hooks/useBuyback';
 import { ApiError } from '../../lib/api';
@@ -67,7 +68,7 @@ export function ProductInfoPage() {
         </>
       }
     >
-      <ProgressSteps current={3} total={12} />
+      <ProgressSteps current={3} total={10} />
 
       <div className="field-group">
         <label className="text-field">
@@ -77,42 +78,22 @@ export function ProductInfoPage() {
           </div>
         </label>
 
-        <label className="text-field">
-          <span className="text-field__label">Model</span>
-          <div className="text-field__control">
-            <select
-              className="text-field__input"
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
-            >
-              <option value="">Select model</option>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </label>
+        <Select
+          label="Model"
+          placeholder="Select model"
+          value={modelId}
+          onChange={setModelId}
+          options={models.map((m) => ({ value: m.id, label: m.name }))}
+        />
 
-        <label className="text-field">
-          <span className="text-field__label">SKU / Variant</span>
-          <div className="text-field__control">
-            <select
-              className="text-field__input"
-              value={skuId}
-              onChange={(e) => setSkuId(e.target.value)}
-              disabled={!modelId}
-            >
-              <option value="">Select SKU</option>
-              {skus.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </label>
+        <Select
+          label="SKU / Variant"
+          placeholder={modelId ? 'Select SKU' : 'Select a model first'}
+          value={skuId}
+          onChange={setSkuId}
+          disabled={!modelId}
+          options={skus.map((s) => ({ value: s.id, label: s.label }))}
+        />
       </div>
     </PageShell>
   );

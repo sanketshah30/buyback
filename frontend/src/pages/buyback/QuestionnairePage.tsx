@@ -63,20 +63,24 @@ export function QuestionnairePage() {
         </>
       }
     >
-      <ProgressSteps current={5} total={12} />
+      <ProgressSteps current={5} total={10} />
 
       <div className="field-group">
-        {questions.map((question) => (
-          <div key={question.id}>
-            <h3 className="section-label">{question.text}</h3>
-            <OptionList
-              options={question.options}
-              multi={question.type === 'multi-choice'}
-              selectedIds={answers[question.id] ?? []}
-              onChange={(ids) => setAnswers((prev) => ({ ...prev, [question.id]: ids }))}
-            />
-          </div>
-        ))}
+        {questions.map((question) => {
+          const noneOption = question.options.find((o) => o.id === 'none' || o.label.toLowerCase().startsWith('none'));
+          return (
+            <div key={question.id}>
+              <h3 className="question-label">{question.text}</h3>
+              <OptionList
+                options={question.options}
+                multi={question.type === 'multi-choice'}
+                selectedIds={answers[question.id] ?? []}
+                onChange={(ids) => setAnswers((prev) => ({ ...prev, [question.id]: ids }))}
+                exclusiveOptionId={question.type === 'multi-choice' ? noneOption?.id : undefined}
+              />
+            </div>
+          );
+        })}
       </div>
     </PageShell>
   );

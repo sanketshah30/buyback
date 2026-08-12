@@ -35,6 +35,8 @@ export const buybackApi = {
     api.post<BuybackRequest>(`/api/buyback/${id}/finalize-value`, { withDiagnosis: false }),
   submitCustomer: (id: string, name: string, email: string, mobile: string) =>
     api.post<CustomerOtpResponse>(`/api/buyback/${id}/customer`, { name, email, mobile }),
+  resendCustomerOtp: (id: string, channel: 'sms' | 'call' = 'sms') =>
+    api.post<CustomerOtpResponse>(`/api/buyback/${id}/customer/resend-otp`, { channel }),
   verifyCustomerOtp: (id: string, otp: string) =>
     api.post<BuybackRequest>(`/api/buyback/${id}/customer/verify-otp`, { otp }),
   uploadDocument: (id: string, file: File) => {

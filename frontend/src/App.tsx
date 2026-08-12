@@ -15,9 +15,7 @@ import { VideoAssessmentPage } from './pages/buyback/VideoAssessmentPage';
 import { ValuationPage } from './pages/buyback/ValuationPage';
 import { DiagnosisPage } from './pages/buyback/DiagnosisPage';
 import { CustomerInfoPage } from './pages/buyback/CustomerInfoPage';
-import { CustomerOtpPage } from './pages/buyback/CustomerOtpPage';
 import { DocumentProofPage } from './pages/buyback/DocumentProofPage';
-import { ProductImagesPage } from './pages/buyback/ProductImagesPage';
 import { ReviewPage } from './pages/buyback/ReviewPage';
 import { SuccessPage } from './pages/buyback/SuccessPage';
 
@@ -119,26 +117,10 @@ function App() {
             }
           />
           <Route
-            path="/buyback/:id/customer-otp"
-            element={
-              <ProtectedRoute>
-                <CustomerOtpPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/buyback/:id/document"
             element={
               <ProtectedRoute>
                 <DocumentProofPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/product-images"
-            element={
-              <ProtectedRoute>
-                <ProductImagesPage />
               </ProtectedRoute>
             }
           />

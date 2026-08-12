@@ -11,13 +11,23 @@ interface OptionListProps {
   multi?: boolean;
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  /** In multi-choice mode, an option id (e.g. "none") that is mutually exclusive with every other option. */
+  exclusiveOptionId?: string;
 }
 
-export function OptionList({ options, multi = false, selectedIds, onChange }: OptionListProps) {
+export function OptionList({ options, multi = false, selectedIds, onChange, exclusiveOptionId }: OptionListProps) {
   const toggle = (id: string) => {
     if (multi) {
-      if (selectedIds.includes(id)) onChange(selectedIds.filter((s) => s !== id));
-      else onChange([...selectedIds, id]);
+      if (exclusiveOptionId && id === exclusiveOptionId) {
+        onChange(selectedIds.includes(id) ? [] : [id]);
+        return;
+      }
+      if (selectedIds.includes(id)) {
+        onChange(selectedIds.filter((s) => s !== id));
+      } else {
+        const withoutExclusive = exclusiveOptionId ? selectedIds.filter((s) => s !== exclusiveOptionId) : selectedIds;
+        onChange([...withoutExclusive, id]);
+      }
     } else {
       onChange([id]);
     }

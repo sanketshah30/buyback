@@ -314,6 +314,33 @@ buybackRouter.post('/:id/customer', async (req: AuthedRequest, res, next) => {
   }
 });
 
+buybackRouter.post('/:id/customer/resend-otp', async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    const { channel } = req.body as { channel?: 'sms' | 'call' };
+    if (!request.customer) return res.status(400).json({ error: 'Customer details have not been submitted yet' });
+
+    const otp = await authService.requestOtp(request.customer.mobile, 'buyback-confirmation', request.id);
+
+    if (channel === 'call') {
+      await notificationService.sendSms(
+        request.customer.mobile,
+        `[mock voice call] Your buyback OTP is ${otp.devOtp ?? '******'}.`,
+      );
+    } else {
+      await notificationService.sendEmail(request.customer.email, 'Your buyback OTP', `Your OTP is ${otp.devOtp ?? '******'}.`);
+    }
+
+    const updated = await buybackRepository.update(request.id, {
+      customerOtp: { requestId: otp.requestId, verified: false },
+    });
+
+    return res.status(201).json({ request: updated, otpRequestId: otp.requestId, devOtp: otp.devOtp });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 buybackRouter.post('/:id/customer/verify-otp', async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);

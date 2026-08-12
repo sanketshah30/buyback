@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Banner } from '../../components/ui/Banner';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { PageShell } from '../../components/ui/PageShell';
 import { ProgressSteps } from '../../components/ui/ProgressSteps';
+import { Select } from '../../components/ui/Select';
 import { Spinner } from '../../components/ui/Spinner';
 import { ApiError } from '../../lib/api';
 import { buybackApi } from '../../lib/buybackApi';
@@ -15,8 +15,8 @@ export function CategoryBrandPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [category, setCategory] = useState<Category | null>(null);
-  const [brand, setBrand] = useState<Brand | null>(null);
+  const [categoryId, setCategoryId] = useState('');
+  const [brandId, setBrandId] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,21 +30,20 @@ export function CategoryBrandPage() {
   }, []);
 
   useEffect(() => {
-    if (!category) {
+    setBrandId('');
+    if (!categoryId) {
       setBrands([]);
-      setBrand(null);
       return;
     }
-    catalogApi.listBrands(category.id).then(setBrands);
-    setBrand(null);
-  }, [category]);
+    catalogApi.listBrands(categoryId).then(setBrands);
+  }, [categoryId]);
 
   const handleContinue = async () => {
-    if (!category || !brand) return;
+    if (!categoryId || !brandId) return;
     setSubmitting(true);
     setError(null);
     try {
-      const request = await buybackApi.create(category.id, brand.id);
+      const request = await buybackApi.create(categoryId, brandId);
       navigate(`/buyback/${request.id}/device`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to start buyback request');
@@ -54,56 +53,40 @@ export function CategoryBrandPage() {
   };
 
   return (
-    <PageShell title="Start a new buyback" subtitle="Select your device category and brand">
-      <ProgressSteps current={1} total={12} />
+    <PageShell
+      title="Start a new buyback"
+      subtitle="Select your device category and brand"
+      footer={
+        <>
+          {error && <Banner tone="error">{error}</Banner>}
+          <Button onClick={handleContinue} loading={submitting} disabled={!categoryId || !brandId}>
+            Continue
+          </Button>
+        </>
+      }
+    >
+      <ProgressSteps current={1} total={10} />
       {loading && <Spinner label="Loading categories…" />}
-      {error && <Banner tone="error">{error}</Banner>}
 
       {!loading && (
-        <>
-          <section>
-            <h3 className="section-label">Category</h3>
-            <div className="chip-grid">
-              {categories.map((cat) => (
-                <Card
-                  key={cat.id}
-                  interactive
-                  selected={category?.id === cat.id}
-                  onClick={() => setCategory(cat)}
-                  className="chip-card"
-                >
-                  {cat.name}
-                </Card>
-              ))}
-            </div>
-          </section>
-
-          {category && (
-            <section>
-              <h3 className="section-label">Brand</h3>
-              <div className="chip-grid">
-                {brands.map((b) => (
-                  <Card
-                    key={b.id}
-                    interactive
-                    selected={brand?.id === b.id}
-                    onClick={() => setBrand(b)}
-                    className="chip-card"
-                  >
-                    {b.name}
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
-        </>
+        <div className="field-group">
+          <Select
+            label="Category"
+            placeholder="Select a category"
+            value={categoryId}
+            onChange={setCategoryId}
+            options={categories.map((cat) => ({ value: cat.id, label: cat.name }))}
+          />
+          <Select
+            label="Brand"
+            placeholder={categoryId ? 'Select a brand' : 'Select a category first'}
+            value={brandId}
+            onChange={setBrandId}
+            disabled={!categoryId}
+            options={brands.map((b) => ({ value: b.id, label: b.name }))}
+          />
+        </div>
       )}
-
-      <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-        <Button onClick={handleContinue} loading={submitting} disabled={!category || !brand}>
-          Continue
-        </Button>
-      </div>
     </PageShell>
   );
 }

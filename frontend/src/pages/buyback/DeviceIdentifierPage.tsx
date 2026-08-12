@@ -6,6 +6,7 @@ import { PageShell } from '../../components/ui/PageShell';
 import { ProgressSteps } from '../../components/ui/ProgressSteps';
 import { Spinner } from '../../components/ui/Spinner';
 import { TextField } from '../../components/ui/TextField';
+import { ScanIcon } from '../../components/ui/icons';
 import { useBuyback } from '../../hooks/useBuyback';
 import { ApiError } from '../../lib/api';
 import { buybackApi } from '../../lib/buybackApi';
@@ -69,7 +70,7 @@ export function DeviceIdentifierPage() {
         </>
       }
     >
-      <ProgressSteps current={2} total={12} />
+      <ProgressSteps current={2} total={10} />
 
       <div className="field-group">
         <TextField
@@ -80,10 +81,18 @@ export function DeviceIdentifierPage() {
           }
           placeholder={isSmartphone ? 'e.g. 356938035643809' : 'e.g. R58N30ABCD12'}
           inputMode={isSmartphone ? 'numeric' : 'text'}
+          rightSlot={
+            <button
+              type="button"
+              className="text-field__icon-btn"
+              onClick={handleScanSimulate}
+              aria-label={isSmartphone ? 'Scan IMEI barcode' : 'Scan serial barcode'}
+              title={isSmartphone ? 'Scan IMEI barcode' : 'Scan serial barcode'}
+            >
+              <ScanIcon />
+            </button>
+          }
         />
-        <Button variant="secondary" type="button" onClick={handleScanSimulate}>
-          {isSmartphone ? '📷 Scan IMEI barcode' : '📷 Scan serial barcode'}
-        </Button>
         <Banner tone="info">
           {isSmartphone
             ? 'Dial *#06# on the device to find the IMEI, or scan the barcode on the box/SIM tray.'
