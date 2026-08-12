@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { OfflineGate } from './components/OfflineGate';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './lib/auth';
+import { BuybackDraftProvider } from './lib/buybackDraft';
 import { LoginPage } from './pages/LoginPage';
 import { OtpVerifyPage } from './pages/OtpVerifyPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -20,120 +21,126 @@ import { SuccessPage } from './pages/buyback/SuccessPage';
 function App() {
   return (
     <AuthProvider>
-      <OfflineGate>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/otp" element={<OtpVerifyPage />} />
+      <BuybackDraftProvider>
+        <OfflineGate>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/otp" element={<OtpVerifyPage />} />
 
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/buyback/new"
-            element={
-              <ProtectedRoute>
-                <NewBuybackPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/new/:id"
-            element={
-              <ProtectedRoute>
-                <NewBuybackPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/assessment"
-            element={
-              <ProtectedRoute>
-                <AssessmentMethodPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/assessment/questionnaire"
-            element={
-              <ProtectedRoute>
-                <QuestionnairePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/assessment/image"
-            element={
-              <ProtectedRoute>
-                <ImageAssessmentPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/assessment/video"
-            element={
-              <ProtectedRoute>
-                <VideoAssessmentPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/valuation"
-            element={
-              <ProtectedRoute>
-                <ValuationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/diagnosis"
-            element={
-              <ProtectedRoute>
-                <DiagnosisPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/customer"
-            element={
-              <ProtectedRoute>
-                <CustomerInfoPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/document"
-            element={
-              <ProtectedRoute>
-                <DocumentProofPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/review"
-            element={
-              <ProtectedRoute>
-                <ReviewPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyback/:id/success"
-            element={
-              <ProtectedRoute>
-                <SuccessPage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Nothing is persisted to the server for these "new buyback" steps until
+                the valuation step - see src/lib/buybackDraft.tsx. */}
+            <Route
+              path="/buyback/new"
+              element={
+                <ProtectedRoute>
+                  <NewBuybackPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/new/assessment"
+              element={
+                <ProtectedRoute>
+                  <AssessmentMethodPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/new/assessment/questionnaire"
+              element={
+                <ProtectedRoute>
+                  <QuestionnairePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/new/assessment/image"
+              element={
+                <ProtectedRoute>
+                  <ImageAssessmentPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/new/assessment/video"
+              element={
+                <ProtectedRoute>
+                  <VideoAssessmentPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/new/valuation"
+              element={
+                <ProtectedRoute>
+                  <ValuationPage />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </OfflineGate>
+            {/* From here on a real buyback record exists (created at the valuation step). */}
+            <Route
+              path="/buyback/:id/valuation"
+              element={
+                <ProtectedRoute>
+                  <ValuationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/:id/diagnosis"
+              element={
+                <ProtectedRoute>
+                  <DiagnosisPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/:id/customer"
+              element={
+                <ProtectedRoute>
+                  <CustomerInfoPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/:id/document"
+              element={
+                <ProtectedRoute>
+                  <DocumentProofPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/:id/review"
+              element={
+                <ProtectedRoute>
+                  <ReviewPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/:id/success"
+              element={
+                <ProtectedRoute>
+                  <SuccessPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </OfflineGate>
+      </BuybackDraftProvider>
     </AuthProvider>
   );
 }

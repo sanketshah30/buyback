@@ -1,33 +1,26 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Banner } from '../../components/ui/Banner';
 import { Button } from '../../components/ui/Button';
 import { PageShell } from '../../components/ui/PageShell';
 import { ProgressSteps } from '../../components/ui/ProgressSteps';
 import { useCameraPermission } from '../../hooks/useCameraPermission';
-import { ApiError } from '../../lib/api';
-import { buybackApi } from '../../lib/buybackApi';
+import { useBuybackDraft } from '../../lib/buybackDraft';
 
 export function VideoAssessmentPage() {
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { draft, setAssessmentVideo } = useBuybackDraft();
   const { state: permissionState, requestAccess } = useCameraPermission();
   const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!id || !file) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await buybackApi.submitVideo(id, file);
-      navigate(`/buyback/${id}/valuation`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to upload video');
-    } finally {
-      setSubmitting(false);
-    }
+  useEffect(() => {
+    if (!draft.model || !draft.sku) navigate('/buyback/new', { replace: true });
+  }, [draft.model, draft.sku, navigate]);
+
+  const handleSubmit = () => {
+    if (!file) return;
+    setAssessmentVideo(file);
+    navigate('/buyback/new/valuation');
   };
 
   return (
@@ -35,12 +28,9 @@ export function VideoAssessmentPage() {
       title="Video-based assessment"
       subtitle="Record a short walkaround video of your device"
       footer={
-        <>
-          {error && <Banner tone="error">{error}</Banner>}
-          <Button onClick={handleSubmit} loading={submitting} disabled={!file}>
-            Run AI assessment
-          </Button>
-        </>
+        <Button onClick={handleSubmit} disabled={!file}>
+          Run AI assessment
+        </Button>
       }
     >
       <ProgressSteps current={3} total={7} />

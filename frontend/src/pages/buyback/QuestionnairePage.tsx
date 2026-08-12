@@ -1,53 +1,45 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Banner } from '../../components/ui/Banner';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { OptionList } from '../../components/ui/OptionList';
 import { PageShell } from '../../components/ui/PageShell';
 import { ProgressSteps } from '../../components/ui/ProgressSteps';
 import { Spinner } from '../../components/ui/Spinner';
-import { useBuyback } from '../../hooks/useBuyback';
-import { ApiError } from '../../lib/api';
-import { buybackApi } from '../../lib/buybackApi';
+import { useBuybackDraft } from '../../lib/buybackDraft';
 import { catalogApi } from '../../lib/catalogApi';
 import type { Question, QuestionnaireAnswer } from '../../types/api';
 
 export function QuestionnairePage() {
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data, loading } = useBuyback(id);
+  const { draft, setQuestionnaireAnswers } = useBuybackDraft();
 
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!data?.category) return;
-    catalogApi.listQuestions(data.category.id).then(setQuestions);
-  }, [data?.category]);
+    if (!draft.category) {
+      navigate('/buyback/new', { replace: true });
+      return;
+    }
+    catalogApi
+      .listQuestions(draft.category.id)
+      .then(setQuestions)
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.category]);
 
   if (loading) return <PageShell title="Questionnaire"><Spinner /></PageShell>;
-  if (!data) return <PageShell title="Questionnaire"><Banner tone="error">Buyback request not found.</Banner></PageShell>;
 
   const allAnswered = questions.every((q) => (answers[q.id]?.length ?? 0) > 0);
 
-  const handleSubmit = async () => {
-    if (!id) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const payload: QuestionnaireAnswer[] = questions.map((q) => ({
-        questionId: q.id,
-        optionIds: answers[q.id] ?? [],
-      }));
-      await buybackApi.submitQuestionnaire(id, payload);
-      navigate(`/buyback/${id}/valuation`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to submit questionnaire');
-    } finally {
-      setSubmitting(false);
-    }
+  const handleSubmit = () => {
+    const payload: QuestionnaireAnswer[] = questions.map((q) => ({
+      questionId: q.id,
+      optionIds: answers[q.id] ?? [],
+    }));
+    setQuestionnaireAnswers(payload);
+    navigate('/buyback/new/valuation');
   };
 
   return (
@@ -55,12 +47,9 @@ export function QuestionnairePage() {
       title="Physical assessment"
       subtitle="Answer the following questions about your device"
       footer={
-        <>
-          {error && <Banner tone="error">{error}</Banner>}
-          <Button onClick={handleSubmit} loading={submitting} disabled={!allAnswered || questions.length === 0}>
-            Continue
-          </Button>
-        </>
+        <Button onClick={handleSubmit} disabled={!allAnswered || questions.length === 0}>
+          Continue
+        </Button>
       }
     >
       <ProgressSteps current={3} total={7} />

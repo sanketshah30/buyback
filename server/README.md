@@ -72,3 +72,15 @@ No route or service code needs to change - they only depend on the repository in
 | `POST /api/buyback/:id/confirm` | Confirm the buyback - moves it into history |
 
 All `/api/buyback/*` routes require `Authorization: Bearer <token>` from the OTP login flow.
+
+### When does a buyback record actually get created?
+
+The frontend's category/brand/IMEI/product/assessment steps are all held as local, unsaved
+state (see `frontend/src/lib/buybackDraft.tsx`) - **no `POST /api/buyback` call happens
+until the user finishes the physical assessment and reaches the valuation step**. At that
+point the frontend replays everything it collected in one go (`create` → `device` →
+`product` → `assessment` → `valuation`), so the buyback record only comes into existence,
+and only gets its `{{YYYYMMDD}}-{{Count}}` reference ID, at the exact moment its max value
+is calculated. This means abandoning the flow before reaching valuation never leaves a
+stray draft behind, and editing category/IMEI/product before that point never needs to
+touch the server at all.

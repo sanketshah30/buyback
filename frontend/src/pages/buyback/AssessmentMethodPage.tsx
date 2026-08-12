@@ -1,11 +1,14 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { ImageAssessmentIcon, QuestionnaireIcon, VideoAssessmentIcon } from '../../components/ui/icons';
 import { PageShell } from '../../components/ui/PageShell';
 import { ProgressSteps } from '../../components/ui/ProgressSteps';
+import { useBuybackDraft } from '../../lib/buybackDraft';
+import type { AssessmentMethod } from '../../types/api';
 import './AssessmentMethodPage.css';
 
-const METHODS = [
+const METHODS: { id: AssessmentMethod; title: string; description: string; Icon: typeof QuestionnaireIcon }[] = [
   {
     id: 'questionnaire',
     title: 'Questionnaire based',
@@ -27,8 +30,12 @@ const METHODS = [
 ];
 
 export function AssessmentMethodPage() {
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { draft, setAssessmentMethod } = useBuybackDraft();
+
+  useEffect(() => {
+    if (!draft.model || !draft.sku) navigate('/buyback/new', { replace: true });
+  }, [draft.model, draft.sku, navigate]);
 
   return (
     <PageShell title="Physical assessment" subtitle="Choose how you'd like to assess your device's condition">
@@ -36,7 +43,14 @@ export function AssessmentMethodPage() {
 
       <div className="field-group">
         {METHODS.map(({ id: methodId, title, description, Icon }) => (
-          <Card key={methodId} interactive onClick={() => navigate(`/buyback/${id}/assessment/${methodId}`)}>
+          <Card
+            key={methodId}
+            interactive
+            onClick={() => {
+              setAssessmentMethod(methodId);
+              navigate(`/buyback/new/assessment/${methodId}`);
+            }}
+          >
             <div className="method-option">
               <span className="method-option__icon">
                 <Icon />

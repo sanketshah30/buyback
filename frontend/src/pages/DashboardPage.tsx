@@ -6,14 +6,14 @@ import { PageShell } from '../components/ui/PageShell';
 import { Spinner } from '../components/ui/Spinner';
 import { useAuth } from '../lib/auth';
 import { buybackApi } from '../lib/buybackApi';
+import { useBuybackDraft } from '../lib/buybackDraft';
 import type { BuybackRequest } from '../types/api';
 import './DashboardPage.css';
 
+// Category, IMEI/serial, product, and physical assessment are all captured as local,
+// unsaved state (see src/lib/buybackDraft.tsx) - no backend record exists for a buyback
+// until its value has been calculated, so only those later statuses are ever resumable.
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  device_captured: 'Device captured',
-  product_selected: 'Product selected',
-  assessment_completed: 'Assessment done',
   valuation_ready: 'Valuation ready',
   diagnosis_pending: 'Diagnosis in progress',
   diagnosis_completed: 'Diagnosis complete',
@@ -26,10 +26,6 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const RESUME_ROUTE: Record<string, (id: string) => string> = {
-  draft: (id) => `/buyback/new/${id}`,
-  device_captured: (id) => `/buyback/new/${id}`,
-  product_selected: (id) => `/buyback/${id}/assessment`,
-  assessment_completed: (id) => `/buyback/${id}/valuation`,
   valuation_ready: (id) => `/buyback/${id}/valuation`,
   diagnosis_pending: (id) => `/buyback/${id}/diagnosis`,
   diagnosis_completed: (id) => `/buyback/${id}/diagnosis`,
@@ -43,6 +39,7 @@ const RESUME_ROUTE: Record<string, (id: string) => string> = {
 export function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { reset: resetDraft } = useBuybackDraft();
   const [history, setHistory] = useState<BuybackRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +53,12 @@ export function DashboardPage() {
   }, []);
 
   const confirmed = history.filter((h) => h.status === 'confirmed');
-  const inProgress = history.filter((h) => h.status !== 'confirmed');
+  const inProgress = history.filter((h) => h.status in RESUME_ROUTE);
+
+  const handleStartNewBuyback = () => {
+    resetDraft();
+    navigate('/buyback/new');
+  };
 
   return (
     <PageShell showBack={false}>
@@ -70,7 +72,7 @@ export function DashboardPage() {
         </button>
       </div>
 
-      <Card interactive onClick={() => navigate('/buyback/new')} className="dashboard-cta">
+      <Card interactive onClick={handleStartNewBuyback} className="dashboard-cta">
         <div>
           <h2>Start a new buyback</h2>
           <p>Get an instant estimate for your smartphone, tablet, laptop or smartwatch.</p>

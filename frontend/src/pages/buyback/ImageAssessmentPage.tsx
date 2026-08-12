@@ -1,12 +1,11 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Banner } from '../../components/ui/Banner';
 import { Button } from '../../components/ui/Button';
 import { PageShell } from '../../components/ui/PageShell';
 import { ProgressSteps } from '../../components/ui/ProgressSteps';
 import { useCameraPermission } from '../../hooks/useCameraPermission';
-import { ApiError } from '../../lib/api';
-import { buybackApi } from '../../lib/buybackApi';
+import { useBuybackDraft } from '../../lib/buybackDraft';
 
 const SIDES = [
   { id: 'front', label: 'Front' },
@@ -18,12 +17,14 @@ const SIDES = [
 ];
 
 export function ImageAssessmentPage() {
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { draft, setAssessmentImages } = useBuybackDraft();
   const { state: permissionState, requestAccess } = useCameraPermission();
   const [files, setFiles] = useState<Record<string, File | null>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!draft.model || !draft.sku) navigate('/buyback/new', { replace: true });
+  }, [draft.model, draft.sku, navigate]);
 
   const filledCount = Object.values(files).filter(Boolean).length;
 
@@ -31,19 +32,10 @@ export function ImageAssessmentPage() {
     setFiles((prev) => ({ ...prev, [sideId]: file }));
   };
 
-  const handleSubmit = async () => {
-    if (!id) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const selected = SIDES.map((side) => files[side.id]).filter((f): f is File => Boolean(f));
-      await buybackApi.submitImages(id, selected);
-      navigate(`/buyback/${id}/valuation`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to upload images');
-    } finally {
-      setSubmitting(false);
-    }
+  const handleSubmit = () => {
+    const selected = SIDES.map((side) => files[side.id]).filter((f): f is File => Boolean(f));
+    setAssessmentImages(selected);
+    navigate('/buyback/new/valuation');
   };
 
   return (
@@ -51,12 +43,9 @@ export function ImageAssessmentPage() {
       title="Image-based assessment"
       subtitle="Capture all 6 sides of the device for AI analysis"
       footer={
-        <>
-          {error && <Banner tone="error">{error}</Banner>}
-          <Button onClick={handleSubmit} loading={submitting} disabled={filledCount === 0}>
-            Run AI assessment ({filledCount}/6)
-          </Button>
-        </>
+        <Button onClick={handleSubmit} disabled={filledCount === 0}>
+          Run AI assessment ({filledCount}/6)
+        </Button>
       }
     >
       <ProgressSteps current={3} total={7} />

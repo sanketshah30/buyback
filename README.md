@@ -36,15 +36,13 @@ No routes, services, or frontend code need to change - see `server/README.md` fo
 ## Product flow implemented
 
 1. Mobile number + OTP login → dashboard with "start new buyback" and history/in-progress sections.
-2. Category + brand selection.
-3. Device identifier capture - 16-digit numeric IMEI for smartphones, 12-16 character alphanumeric serial for everything else (with a mock "scan barcode" shortcut).
-4. Product details - brand (carried over), model and SKU dropdowns.
-5. Physical assessment - questionnaire (configurable per category, single/multi-choice), image-based AI assessment (6-side photo capture, mapped to the same questionnaire), or video-based AI assessment.
-6. Instant max-value estimate + auto-generated buyback ID (`{{YYYYMMDD}}-{{Count}}`).
-7. Continue without diagnosis (35% drop, configurable) or continue with diagnosis (QR code hand-off + live polling of a simulated diagnosis job, then a recalculated final value).
-8. Customer details capture, OTP verification (SMS + email, both mocked).
-9. Document proof upload, plus a second round of 6-side images if the questionnaire path was used (skipped for the AI-assessed paths, per spec).
-10. Review screen (product, assessment answers, final value) → confirm → success screen → appears in dashboard history.
+2. Category + brand selection, device identifier capture (16-digit numeric IMEI for smartphones, 12-16 character alphanumeric serial for everything else, with a mock "scan barcode" shortcut), and product details (model + SKU) - presented as one page with progressive accordion sections. **Nothing is sent to the server for any of this** until step 6 below - see "When does a buyback record actually get created?" in `server/README.md`. Completed sections can be reopened and edited at any point before then, purely as local state.
+3. Physical assessment - questionnaire (configurable per category, single/multi-choice, with "None of these" mutually exclusive against the other accessory options), image-based AI assessment (6-side photo capture, mapped to the same questionnaire), or video-based AI assessment.
+4. Instant max-value estimate + auto-generated buyback reference ID (`{{YYYYMMDD}}-{{Count}}`) - this is the moment the buyback record is actually created on the server.
+5. Continue without diagnosis (configurable value drop) or continue with diagnosis (QR code hand-off, vertically centered, + live polling of a simulated diagnosis job, then a recalculated final value).
+6. A single "Confirm buyback" page showing the final value alongside the customer details form; submitting it opens an OTP entry drawer (bottom sheet) with "Resend OTP" / "Send OTP over call" actions, instead of a separate page.
+7. A single "Document & device proof" page for the ID/document photo, plus a second round of 6-side images if the questionnaire path was used (skipped for the AI-assessed paths, per spec).
+8. Review screen (product, assessment answers, final value) → confirm → success screen → appears in dashboard history.
 
 ## Technical constraints followed
 
@@ -65,6 +63,7 @@ server/     See server/README.md for the full API reference and mock-data notes.
 ## Known MVP simplifications (documented for whoever wires up production)
 
 - All data lives in server memory and resets on restart - see "Why mock data?" above.
+- The category/IMEI/product/assessment steps are held in frontend memory only (`frontend/src/lib/buybackDraft.tsx`) until valuation - if the browser tab is closed or hard-refreshed before that point, that in-progress draft is lost (there's nothing to resume, by design). Once a buyback reaches valuation, it's a real, resumable backend record.
 - OTP delivery, SMS and email are logged to the server console instead of hitting a real gateway.
 - "Scan barcode" is simulated (fills a random valid IMEI/serial) rather than using a live camera barcode scanner.
 - AI image/video assessment deterministically maps uploads to questionnaire answers instead of calling a real vision model.
