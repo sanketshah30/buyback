@@ -78,3 +78,37 @@
   flex-direction: column;
   gap: 16px;
 }
+
+.accordion-inline-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--color-gold-soft);
+}
+
+.accordion-inline-status::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-gold);
+  animation: accordion-status-spin 0.8s linear infinite;
+}
+
+@keyframes accordion-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.accordion-retry-link {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}

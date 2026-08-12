@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AccordionSection } from '../../components/ui/AccordionSection';
 import { Banner } from '../../components/ui/Banner';
@@ -16,6 +16,8 @@ import { catalogApi } from '../../lib/catalogApi';
 import type { Brand, Category, DeviceCategoryType, Model, Sku } from '../../types/api';
 
 type SectionKey = 'category' | 'device' | 'product';
+
+const DEVICE_SAVE_DEBOUNCE_MS = 450;
 
 function randomDigits(length: number) {
   let result = '';
@@ -55,8 +57,11 @@ export function NewBuybackPage() {
   const [modelId, setModelId] = useState('');
   const [skuId, setSkuId] = useState('');
 
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingSection, setSubmittingSection] = useState<SectionKey | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const categoryLockRef = useRef(false);
+  const deviceLockRef = useRef(false);
 
   useEffect(() => {
     catalogApi.listCategories().then(setCategories);
@@ -66,12 +71,14 @@ export function NewBuybackPage() {
   useEffect(() => {
     if (!resumeId || !existing) return;
     setBuybackId(existing.id);
+    categoryLockRef.current = true;
     if (existing.category) {
       setCategoryId(existing.category.id);
       setCategoryType(existing.category.type);
     }
     if (existing.brand) setBrandId(existing.brand.id);
     if (existing.identifier) {
+      deviceLockRef.current = true;
       setDeviceValue(existing.identifier.value);
       setActiveSection('product');
     } else {
@@ -104,6 +111,61 @@ export function NewBuybackPage() {
     catalogApi.listSkus(modelId).then(setSkus);
   }, [modelId]);
 
+  const submitCategory = async () => {
+    if (!categoryId || !brandId || categoryLockRef.current) return;
+    categoryLockRef.current = true;
+    setSubmittingSection('category');
+    setError(null);
+    try {
+      const request = await buybackApi.create(categoryId, brandId);
+      setBuybackId(request.id);
+      setCategoryType(request.category?.type);
+      setActiveSection('device');
+    } catch (err) {
+      categoryLockRef.current = false;
+      setError(err instanceof ApiError ? err.message : 'Failed to start buyback request');
+    } finally {
+      setSubmittingSection(null);
+    }
+  };
+
+  // Section 1 auto-advances the moment both category and brand are picked - no extra click needed.
+  useEffect(() => {
+    if (activeSection !== 'category' || buybackId) return;
+    if (!categoryId || !brandId) return;
+    submitCategory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, brandId, activeSection, buybackId]);
+
+  const submitDevice = async () => {
+    if (!buybackId || deviceLockRef.current) return;
+    deviceLockRef.current = true;
+    setSubmittingSection('device');
+    setError(null);
+    try {
+      await buybackApi.setDevice(buybackId, deviceValue);
+      setActiveSection('product');
+    } catch (err) {
+      deviceLockRef.current = false;
+      setError(err instanceof ApiError ? err.message : 'Failed to save device details');
+    } finally {
+      setSubmittingSection(null);
+    }
+  };
+
+  const isSmartphone = categoryType === 'smartphone';
+  const deviceValid = isSmartphone ? /^\d{16}$/.test(deviceValue) : /^[a-zA-Z0-9]{12,16}$/.test(deviceValue);
+
+  // Section 2 auto-advances a moment after a valid IMEI/serial is entered - no extra click needed.
+  useEffect(() => {
+    if (activeSection !== 'device' || !buybackId || !deviceValid) return;
+    const timer = setTimeout(() => {
+      submitDevice();
+    }, DEVICE_SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceValue, deviceValid, activeSection, buybackId]);
+
   if (resumeId && (loadingExisting || !hydrated)) {
     return (
       <PageShell title="Start a new buyback">
@@ -113,9 +175,7 @@ export function NewBuybackPage() {
   }
 
   const categoryDone = Boolean(buybackId);
-  const isSmartphone = categoryType === 'smartphone';
-  const deviceValid = isSmartphone ? /^\d{16}$/.test(deviceValue) : /^[a-zA-Z0-9]{12,16}$/.test(deviceValue);
-  const deviceDone = categoryDone && deviceValid && activeSection === 'product';
+  const deviceDone = categoryDone && activeSection === 'product';
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const selectedBrand = brands.find((b) => b.id === brandId);
@@ -126,39 +186,9 @@ export function NewBuybackPage() {
     setDeviceValue(isSmartphone ? randomDigits(16) : randomSerial(14));
   };
 
-  const handleContinueCategory = async () => {
-    if (!categoryId || !brandId) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const request = await buybackApi.create(categoryId, brandId);
-      setBuybackId(request.id);
-      setCategoryType(request.category?.type);
-      setActiveSection('device');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to start buyback request');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleContinueDevice = async () => {
-    if (!buybackId) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await buybackApi.setDevice(buybackId, deviceValue);
-      setActiveSection('product');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to save device details');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleContinueProduct = async () => {
     if (!buybackId || !modelId || !skuId) return;
-    setSubmitting(true);
+    setSubmittingSection('product');
     setError(null);
     try {
       await buybackApi.setProduct(buybackId, modelId, skuId);
@@ -166,15 +196,9 @@ export function NewBuybackPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to save product details');
     } finally {
-      setSubmitting(false);
+      setSubmittingSection(null);
     }
   };
-
-  const footerAction = {
-    category: { label: 'Continue', disabled: !categoryId || !brandId, onClick: handleContinueCategory },
-    device: { label: 'Continue', disabled: !deviceValid, onClick: handleContinueDevice },
-    product: { label: 'Continue to assessment', disabled: !modelId || !skuId, onClick: handleContinueProduct },
-  }[activeSection];
 
   const currentStep = activeSection === 'category' ? 1 : activeSection === 'device' ? 2 : 3;
 
@@ -183,12 +207,14 @@ export function NewBuybackPage() {
       title="Start a new buyback"
       subtitle="Complete each step to get your device assessed"
       footer={
-        <>
-          {error && <Banner tone="error">{error}</Banner>}
-          <Button onClick={footerAction.onClick} loading={submitting} disabled={footerAction.disabled}>
-            {footerAction.label}
-          </Button>
-        </>
+        activeSection === 'product' ? (
+          <>
+            {error && <Banner tone="error">{error}</Banner>}
+            <Button onClick={handleContinueProduct} loading={submittingSection === 'product'} disabled={!modelId || !skuId}>
+              Continue to assessment
+            </Button>
+          </>
+        ) : undefined
       }
     >
       <ProgressSteps current={currentStep} total={10} />
@@ -218,6 +244,15 @@ export function NewBuybackPage() {
             disabled={!categoryId}
             options={brands.map((b) => ({ value: b.id, label: b.name }))}
           />
+          {submittingSection === 'category' && <p className="accordion-inline-status">Starting your buyback…</p>}
+          {error && activeSection === 'category' && (
+            <Banner tone="error">
+              {error}{' '}
+              <button type="button" className="accordion-retry-link" onClick={submitCategory}>
+                Try again
+              </button>
+            </Banner>
+          )}
         </AccordionSection>
 
         <AccordionSection
@@ -253,6 +288,15 @@ export function NewBuybackPage() {
               ? 'Dial *#06# on the device to find the IMEI, or scan the barcode on the box/SIM tray.'
               : 'The serial number is usually printed on the underside of the device or inside the battery compartment.'}
           </Banner>
+          {submittingSection === 'device' && <p className="accordion-inline-status">Saving…</p>}
+          {error && activeSection === 'device' && (
+            <Banner tone="error">
+              {error}{' '}
+              <button type="button" className="accordion-retry-link" onClick={submitDevice}>
+                Try again
+              </button>
+            </Banner>
+          )}
         </AccordionSection>
 
         <AccordionSection
