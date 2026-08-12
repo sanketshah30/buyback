@@ -3,7 +3,9 @@
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   transition: border-color 0.15s ease, opacity 0.15s ease;
-  overflow: hidden;
+  /* No overflow:hidden here - the Select dropdown menu inside the active
+     section's body is absolutely positioned and needs to be able to
+     overflow this card's rounded corners to remain visible. */
 }
 
 .accordion-section--active {
