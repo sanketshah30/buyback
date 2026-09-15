@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { v4 as uuid } from 'uuid';
 import { requireAuth } from '../middleware/auth.middleware';
 import { partnerRepository } from '../repositories';
 import { Partner, PartnerType } from '../types/domain';
+import { nextId } from '../utils/idGenerator';
+import { parseId } from '../utils/parseId';
 
 export const partnersRouter = Router();
 partnersRouter.use(requireAuth);
@@ -48,7 +49,7 @@ partnersRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const partner: Partner = {
-      id: uuid(),
+      id: nextId('partners'),
       name: body.name!,
       address: body.address!,
       city: body.city!,
@@ -70,7 +71,8 @@ partnersRouter.post('/', async (req, res, next) => {
 
 partnersRouter.get('/:id', async (req, res, next) => {
   try {
-    const partner = await partnerRepository.findById(req.params.id);
+    const id = parseId(req.params.id);
+    const partner = id !== undefined ? await partnerRepository.findById(id) : undefined;
     if (!partner) return res.status(404).json({ error: 'Partner not found' });
     return res.json(partner);
   } catch (err) {
@@ -80,8 +82,9 @@ partnersRouter.get('/:id', async (req, res, next) => {
 
 partnersRouter.patch('/:id', async (req, res, next) => {
   try {
-    const existing = await partnerRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Partner not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await partnerRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'Partner not found' });
 
     const body = req.body as Partial<Partner>;
     if (body.partnerType && !PARTNER_TYPES.includes(body.partnerType)) {
@@ -93,7 +96,7 @@ partnersRouter.patch('/:id', async (req, res, next) => {
     }
 
     const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...patch } = body;
-    const updated = await partnerRepository.update(req.params.id, patch);
+    const updated = await partnerRepository.update(id, patch);
     return res.json(updated);
   } catch (err) {
     return next(err);

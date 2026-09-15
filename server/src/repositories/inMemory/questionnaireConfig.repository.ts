@@ -1,6 +1,7 @@
 import { QuestionnaireConfig } from '../../types/domain';
 import { QuestionnaireConfigRepository, ResolvedQuestionnaireQuestion } from '../interfaces';
-import { tables } from './db';
+import { indexes, profileKey, tables } from './db';
+import { addToIndex, getIndexed } from './indexUtils';
 
 const FALLBACK_LANGUAGE = 'en';
 
@@ -18,10 +19,12 @@ function findTranslatedText(
 export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfigRepository {
   async create(config: QuestionnaireConfig): Promise<QuestionnaireConfig> {
     tables.questionnaireConfigs.set(config.id, config);
+    addToIndex(indexes.questionnaireConfigsByProfile, profileKey(config.productCategoryId, config.brandId, config.partnerId), config.id);
+    addToIndex(indexes.questionnaireConfigsByCategory, config.productCategoryId, config.id);
     return config;
   }
 
-  async update(id: string, patch: Partial<QuestionnaireConfig>): Promise<QuestionnaireConfig> {
+  async update(id: number, patch: Partial<QuestionnaireConfig>): Promise<QuestionnaireConfig> {
     const existing = tables.questionnaireConfigs.get(id);
     if (!existing) {
       throw Object.assign(new Error(`Questionnaire config ${id} not found`), { status: 404 });
@@ -31,18 +34,19 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
     return updated;
   }
 
-  async findById(id: string): Promise<QuestionnaireConfig | undefined> {
+  async findById(id: number): Promise<QuestionnaireConfig | undefined> {
     return tables.questionnaireConfigs.get(id);
   }
 
   async list(filter?: {
-    productCategoryId?: string;
-    brandId?: string | null;
-    partnerId?: string | null;
+    productCategoryId?: number;
+    brandId?: number | null;
+    partnerId?: number | null;
     isActive?: boolean;
   }): Promise<QuestionnaireConfig[]> {
-    let result = Array.from(tables.questionnaireConfigs.values());
-    if (filter?.productCategoryId !== undefined) result = result.filter((c) => c.productCategoryId === filter.productCategoryId);
+    let result = filter?.productCategoryId !== undefined
+      ? getIndexed(indexes.questionnaireConfigsByCategory, filter.productCategoryId, tables.questionnaireConfigs)
+      : Array.from(tables.questionnaireConfigs.values());
     if (filter?.brandId !== undefined) result = result.filter((c) => c.brandId === filter.brandId);
     if (filter?.partnerId !== undefined) result = result.filter((c) => c.partnerId === filter.partnerId);
     if (filter?.isActive !== undefined) result = result.filter((c) => c.isActive === filter.isActive);
@@ -60,19 +64,17 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
    * tiers 1/3 only if a brandId was provided - you can't match a "specific
    * X" tier without an X to match against. The FIRST tier (in that order)
    * with at least one config row wins; its rows all become the answer -
-   * we never partially blend multiple tiers together.
+   * we never partially blend multiple tiers together. Each tier is a
+   * single O(1) index lookup via the (category, brand, partner) composite
+   * index, never a linear scan.
    */
   async resolve(
-    productCategoryId: string,
-    brandId: string | undefined,
-    partnerId: string | undefined,
+    productCategoryId: number,
+    brandId: number | undefined,
+    partnerId: number | undefined,
     language: string,
   ): Promise<ResolvedQuestionnaireQuestion[]> {
-    const candidates = Array.from(tables.questionnaireConfigs.values()).filter(
-      (c) => c.isActive && c.productCategoryId === productCategoryId,
-    );
-
-    const tiers: { brandId: string | null; partnerId: string | null }[] = [];
+    const tiers: { brandId: number | null; partnerId: number | null }[] = [];
     if (brandId !== undefined && partnerId !== undefined) tiers.push({ brandId, partnerId });
     if (partnerId !== undefined) tiers.push({ brandId: null, partnerId });
     if (brandId !== undefined) tiers.push({ brandId, partnerId: null });
@@ -80,7 +82,11 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
 
     let matched: QuestionnaireConfig[] = [];
     for (const tier of tiers) {
-      const rows = candidates.filter((c) => c.brandId === tier.brandId && c.partnerId === tier.partnerId);
+      const rows = getIndexed(
+        indexes.questionnaireConfigsByProfile,
+        profileKey(productCategoryId, tier.brandId, tier.partnerId),
+        tables.questionnaireConfigs,
+      ).filter((c) => c.isActive);
       if (rows.length > 0) {
         matched = rows;
         break;
@@ -91,10 +97,10 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
     // Group the matched (question, answer) config rows back up by their
     // underlying question - a question with N answer options has N config
     // rows here, all sharing one `sequence` for that question's position.
-    const grouped = new Map<string, { sequence: number; questionAnswerIds: string[] }>();
+    const grouped = new Map<number, { sequence: number; questionAnswerIds: number[] }>();
     for (const config of matched) {
       const questionId = this.questionIdFor(config.questionAnswerId);
-      if (!questionId) continue;
+      if (questionId === undefined) continue;
       const entry = grouped.get(questionId) ?? { sequence: config.sequence, questionAnswerIds: [] };
       entry.questionAnswerIds.push(config.questionAnswerId);
       grouped.set(questionId, entry);
@@ -105,7 +111,11 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
       const question = tables.masterQuestions.get(questionId);
       if (!question || !question.isActive) continue;
 
-      const questionText = findTranslatedText(Array.from(tables.questionTranslations.values()).filter((t) => t.questionId === questionId), language) ?? questionId;
+      const questionText =
+        findTranslatedText(
+          getIndexed(indexes.questionTranslationsByQuestionId, questionId, tables.questionTranslations),
+          language,
+        ) ?? String(questionId);
 
       const answers: ResolvedQuestionnaireQuestion['answers'] = [];
       for (const qaId of questionAnswerIds) {
@@ -113,7 +123,11 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
         if (!qam || !qam.isActive) continue;
         const answer = tables.masterAnswers.get(qam.answerId);
         if (!answer || !answer.isActive) continue;
-        const answerText = findTranslatedText(Array.from(tables.answerTranslations.values()).filter((t) => t.answerId === answer.id), language) ?? answer.code;
+        const answerText =
+          findTranslatedText(
+            getIndexed(indexes.answerTranslationsByAnswerId, answer.id, tables.answerTranslations),
+            language,
+          ) ?? answer.code;
         answers.push({ answerId: answer.id, code: answer.code, text: answerText });
       }
 
@@ -124,7 +138,7 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
     return results;
   }
 
-  private questionIdFor(questionAnswerId: string): string | undefined {
+  private questionIdFor(questionAnswerId: number): number | undefined {
     return tables.questionAnswerMappings.get(questionAnswerId)?.questionId;
   }
 }

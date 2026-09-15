@@ -1,14 +1,16 @@
 import { QuestionAnswerMapping } from '../../types/domain';
 import { QuestionAnswerMappingRepository } from '../interfaces';
-import { tables } from './db';
+import { indexes, tables } from './db';
+import { addToIndex, getIndexed } from './indexUtils';
 
 export class InMemoryQuestionAnswerMappingRepository implements QuestionAnswerMappingRepository {
   async create(mapping: QuestionAnswerMapping): Promise<QuestionAnswerMapping> {
     tables.questionAnswerMappings.set(mapping.id, mapping);
+    addToIndex(indexes.questionAnswerMappingsByQuestionId, mapping.questionId, mapping.id);
     return mapping;
   }
 
-  async update(id: string, patch: Partial<QuestionAnswerMapping>): Promise<QuestionAnswerMapping> {
+  async update(id: number, patch: Partial<QuestionAnswerMapping>): Promise<QuestionAnswerMapping> {
     const existing = tables.questionAnswerMappings.get(id);
     if (!existing) {
       throw Object.assign(new Error(`Question-answer mapping ${id} not found`), { status: 404 });
@@ -18,12 +20,12 @@ export class InMemoryQuestionAnswerMappingRepository implements QuestionAnswerMa
     return updated;
   }
 
-  async findById(id: string): Promise<QuestionAnswerMapping | undefined> {
+  async findById(id: number): Promise<QuestionAnswerMapping | undefined> {
     return tables.questionAnswerMappings.get(id);
   }
 
-  async listByQuestion(questionId: string): Promise<QuestionAnswerMapping[]> {
-    return Array.from(tables.questionAnswerMappings.values()).filter((m) => m.questionId === questionId && m.isActive);
+  async listByQuestion(questionId: number): Promise<QuestionAnswerMapping[]> {
+    return getIndexed(indexes.questionAnswerMappingsByQuestionId, questionId, tables.questionAnswerMappings).filter((m) => m.isActive);
   }
 
   async list(filter?: { isActive?: boolean }): Promise<QuestionAnswerMapping[]> {

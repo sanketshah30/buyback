@@ -1,48 +1,54 @@
-import { brands, categories, products, questionsByCategory, skuAliases, skus } from '../../data/catalog.seed';
+import { brands, categories, questionsByCategory } from '../../data/catalog.seed';
 import { Brand, Category, Product, Question, Sku, SkuAlias } from '../../types/domain';
 import { CatalogRepository } from '../interfaces';
+import { tables, indexes } from './db';
+import { getIndexed } from './indexUtils';
 
 export class InMemoryCatalogRepository implements CatalogRepository {
   async listCategories(): Promise<Category[]> {
     return categories.filter((c) => c.isActive);
   }
 
-  async listBrandsByCategory(categoryId: string): Promise<Brand[]> {
-    const brandIds = new Set(
-      products.filter((p) => p.categoryId === categoryId && p.isActive).map((p) => p.brandId),
-    );
+  async listBrandsByCategory(categoryId: number): Promise<Brand[]> {
+    // Indexed via productsByCategory rather than scanning every product.
+    const productIds = indexes.productsByCategory.get(categoryId) ?? new Set<number>();
+    const brandIds = new Set<number>();
+    for (const productId of productIds) {
+      const product = tables.products.get(productId);
+      if (product?.isActive) brandIds.add(product.brandId);
+    }
     return brands.filter((b) => brandIds.has(b.id) && b.isActive);
   }
 
-  async listProducts(categoryId: string, brandId: string): Promise<Product[]> {
-    return products.filter((p) => p.categoryId === categoryId && p.brandId === brandId && p.isActive);
+  async listProducts(categoryId: number, brandId: number): Promise<Product[]> {
+    return getIndexed(indexes.productsByCategoryAndBrand, `${categoryId}:${brandId}`, tables.products).filter((p) => p.isActive);
   }
 
-  async listSkus(productId: string): Promise<Sku[]> {
-    return skus.filter((s) => s.productId === productId && s.isActive);
+  async listSkus(productId: number): Promise<Sku[]> {
+    return getIndexed(indexes.skusByProductId, productId, tables.skus).filter((s) => s.isActive);
   }
 
-  async listSkuAliases(skuId: string): Promise<SkuAlias[]> {
-    return skuAliases.filter((a) => a.skuId === skuId && a.isActive);
+  async listSkuAliases(skuId: number): Promise<SkuAlias[]> {
+    return getIndexed(indexes.skuAliasesBySkuId, skuId, tables.skuAliases).filter((a) => a.isActive);
   }
 
-  async getCategory(categoryId: string): Promise<Category | undefined> {
+  async getCategory(categoryId: number): Promise<Category | undefined> {
     return categories.find((c) => c.id === categoryId && c.isActive);
   }
 
-  async getBrand(brandId: string): Promise<Brand | undefined> {
+  async getBrand(brandId: number): Promise<Brand | undefined> {
     return brands.find((b) => b.id === brandId && b.isActive);
   }
 
-  async getProduct(productId: string): Promise<Product | undefined> {
-    return products.find((p) => p.id === productId && p.isActive);
+  async getProduct(productId: number): Promise<Product | undefined> {
+    return tables.products.get(productId);
   }
 
-  async getSku(skuId: string): Promise<Sku | undefined> {
-    return skus.find((s) => s.id === skuId && s.isActive);
+  async getSku(skuId: number): Promise<Sku | undefined> {
+    return tables.skus.get(skuId);
   }
 
-  async listQuestions(categoryId: string): Promise<Question[]> {
+  async listQuestions(categoryId: number): Promise<Question[]> {
     return questionsByCategory[categoryId] ?? [];
   }
 }

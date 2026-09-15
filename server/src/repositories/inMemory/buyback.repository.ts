@@ -1,35 +1,38 @@
 import { BuybackRequest } from '../../types/domain';
 import { BuybackRepository } from '../interfaces';
-import { tables } from './db';
+import { indexes, tables } from './db';
+import { addToIndex, getIndexed } from './indexUtils';
 
 export class InMemoryBuybackRepository implements BuybackRepository {
   async create(request: BuybackRequest): Promise<BuybackRequest> {
     tables.buybackRequests.set(request.id, request);
+    addToIndex(indexes.buybackRequestsByUserId, request.userId, request.id);
     return request;
   }
 
-  async findById(id: string): Promise<BuybackRequest | undefined> {
+  async findById(id: number): Promise<BuybackRequest | undefined> {
     return tables.buybackRequests.get(id);
   }
 
-  async update(id: string, patch: Partial<BuybackRequest>): Promise<BuybackRequest> {
+  async update(id: number, patch: Partial<BuybackRequest>): Promise<BuybackRequest> {
     const existing = tables.buybackRequests.get(id);
     if (!existing) {
-      throw new Error(`Buyback request ${id} not found`);
+      throw Object.assign(new Error(`Buyback request ${id} not found`), { status: 404 });
     }
     const updated: BuybackRequest = {
       ...existing,
       ...patch,
+      id: existing.id,
       updatedAt: new Date().toISOString(),
     };
     tables.buybackRequests.set(id, updated);
     return updated;
   }
 
-  async listByUser(userId: string): Promise<BuybackRequest[]> {
-    return Array.from(tables.buybackRequests.values())
-      .filter((r) => r.userId === userId)
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  async listByUser(userId: number): Promise<BuybackRequest[]> {
+    return getIndexed(indexes.buybackRequestsByUserId, userId, tables.buybackRequests).sort((a, b) =>
+      a.createdAt < b.createdAt ? 1 : -1,
+    );
   }
 
   async nextDailySequence(dateKey: string): Promise<number> {

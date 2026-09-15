@@ -1,6 +1,8 @@
 import { QuestionTranslation } from '../../types/domain';
+import { nextId } from '../../utils/idGenerator';
 import { QuestionTranslationRepository } from '../interfaces';
-import { tables } from './db';
+import { indexes, tables } from './db';
+import { addToIndex, getIndexed } from './indexUtils';
 
 export class InMemoryQuestionTranslationRepository implements QuestionTranslationRepository {
   async upsert(translation: QuestionTranslation): Promise<QuestionTranslation> {
@@ -10,17 +12,19 @@ export class InMemoryQuestionTranslationRepository implements QuestionTranslatio
       tables.questionTranslations.set(existing.id, updated);
       return updated;
     }
-    tables.questionTranslations.set(translation.id, translation);
-    return translation;
+    const record: QuestionTranslation = translation.id ? translation : { ...translation, id: nextId('question_translations') };
+    tables.questionTranslations.set(record.id, record);
+    addToIndex(indexes.questionTranslationsByQuestionId, record.questionId, record.id);
+    return record;
   }
 
-  async listByQuestion(questionId: string): Promise<QuestionTranslation[]> {
-    return Array.from(tables.questionTranslations.values()).filter((t) => t.questionId === questionId && t.isActive);
+  async listByQuestion(questionId: number): Promise<QuestionTranslation[]> {
+    return getIndexed(indexes.questionTranslationsByQuestionId, questionId, tables.questionTranslations).filter((t) => t.isActive);
   }
 
-  async find(questionId: string, language: string): Promise<QuestionTranslation | undefined> {
-    return Array.from(tables.questionTranslations.values()).find(
-      (t) => t.questionId === questionId && t.language === language && t.isActive,
+  async find(questionId: number, language: string): Promise<QuestionTranslation | undefined> {
+    return getIndexed(indexes.questionTranslationsByQuestionId, questionId, tables.questionTranslations).find(
+      (t) => t.language === language && t.isActive,
     );
   }
 }

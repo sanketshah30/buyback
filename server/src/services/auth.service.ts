@@ -9,7 +9,7 @@ const OTP_TTL_MS = 5 * 60 * 1000;
 const MAX_VERIFY_ATTEMPTS = 5;
 
 export const authService = {
-  async requestOtp(mobile: string, purpose: OtpChallenge['purpose'], buybackId?: string) {
+  async requestOtp(mobile: string, purpose: OtpChallenge['purpose'], buybackId?: number) {
     const requestId = uuid();
     const challenge: OtpChallenge = {
       requestId,

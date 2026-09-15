@@ -14,7 +14,7 @@ const ADJUSTMENT_OUTCOMES: { percent: number; findings: string[] }[] = [
  * diagnostics SDK/service reporting back over a webhook or message queue.
  */
 export const diagnosisService = {
-  initiate(buybackId: string): DiagnosisState {
+  initiate(buybackId: number): DiagnosisState {
     return {
       diagnosisId: uuid(),
       qrToken: `diag:${buybackId}:${uuid()}`,

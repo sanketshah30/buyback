@@ -8,7 +8,7 @@ export class InMemoryRoleRepository implements RoleRepository {
     return role;
   }
 
-  async update(id: string, patch: Partial<Role>): Promise<Role> {
+  async update(id: number, patch: Partial<Role>): Promise<Role> {
     const existing = tables.roles.get(id);
     if (!existing) {
       throw Object.assign(new Error(`Role ${id} not found`), { status: 404 });
@@ -18,7 +18,7 @@ export class InMemoryRoleRepository implements RoleRepository {
     return updated;
   }
 
-  async findById(id: string): Promise<Role | undefined> {
+  async findById(id: number): Promise<Role | undefined> {
     return tables.roles.get(id);
   }
 

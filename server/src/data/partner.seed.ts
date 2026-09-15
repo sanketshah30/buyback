@@ -1,4 +1,5 @@
 import { Partner, PartnerLocation, Role } from '../types/domain';
+import { reserveIdRange } from '../utils/idGenerator';
 
 const SEEDED_AT = '2026-01-01T00:00:00.000Z';
 const audit = { createdAt: SEEDED_AT, updatedAt: SEEDED_AT, isActive: true };
@@ -6,7 +7,7 @@ const audit = { createdAt: SEEDED_AT, updatedAt: SEEDED_AT, isActive: true };
 /** Table: partners */
 export const partners: Partner[] = [
   {
-    id: 'partner-bestbuy',
+    id: 1,
     name: 'BestBuy',
     address: '7601 Penn Ave S',
     city: 'Richfield',
@@ -18,7 +19,7 @@ export const partners: Partner[] = [
     ...audit,
   },
   {
-    id: 'partner-goldie-group',
+    id: 2,
     name: 'Goldie Group',
     address: '400 Refurb Way',
     city: 'Newark',
@@ -30,12 +31,14 @@ export const partners: Partner[] = [
     ...audit,
   },
 ];
+export const PARTNER_BESTBUY_ID = 1;
+export const PARTNER_GOLDIE_GROUP_ID = 2;
 
 /** Table: partner_locations - FK: partnerId -> partners.id */
 export const partnerLocations: PartnerLocation[] = [
   {
-    id: 'location-bestbuy-nyc',
-    partnerId: 'partner-bestbuy',
+    id: 1,
+    partnerId: PARTNER_BESTBUY_ID,
     name: 'BestBuy New York',
     address: '529 5th Ave',
     city: 'New York',
@@ -46,8 +49,8 @@ export const partnerLocations: PartnerLocation[] = [
     ...audit,
   },
   {
-    id: 'location-bestbuy-dallas',
-    partnerId: 'partner-bestbuy',
+    id: 2,
+    partnerId: PARTNER_BESTBUY_ID,
     name: 'BestBuy Dallas',
     address: '11700 Preston Rd',
     city: 'Dallas',
@@ -58,8 +61,8 @@ export const partnerLocations: PartnerLocation[] = [
     ...audit,
   },
   {
-    id: 'location-goldie-newark-hq',
-    partnerId: 'partner-goldie-group',
+    id: 3,
+    partnerId: PARTNER_GOLDIE_GROUP_ID,
     name: 'Goldie Group Newark HQ',
     address: '400 Refurb Way',
     city: 'Newark',
@@ -70,6 +73,9 @@ export const partnerLocations: PartnerLocation[] = [
     ...audit,
   },
 ];
+export const LOCATION_BESTBUY_NYC_ID = 1;
+export const LOCATION_BESTBUY_DALLAS_ID = 2;
+export const LOCATION_GOLDIE_NEWARK_HQ_ID = 3;
 
 /**
  * Table: roles
@@ -78,27 +84,35 @@ export const partnerLocations: PartnerLocation[] = [
  */
 export const roles: Role[] = [
   {
-    id: 'role-super-admin',
+    id: 1,
     name: 'Super Admin',
     rights: ['manage_partners', 'manage_locations', 'manage_users', 'manage_roles', 'view_reports'],
     ...audit,
   },
   {
-    id: 'role-partner-admin',
+    id: 2,
     name: 'Partner Admin',
     rights: ['manage_locations', 'manage_users', 'view_reports'],
     ...audit,
   },
   {
-    id: 'role-vendor-admin',
+    id: 3,
     name: 'Vendor Admin',
     rights: ['manage_locations', 'manage_users', 'view_reports'],
     ...audit,
   },
   {
-    id: 'role-promoter',
+    id: 4,
     name: 'Promoter',
     rights: ['process_buyback'],
     ...audit,
   },
 ];
+export const ROLE_SUPER_ADMIN_ID = 1;
+export const ROLE_PARTNER_ADMIN_ID = 2;
+export const ROLE_VENDOR_ADMIN_ID = 3;
+export const ROLE_PROMOTER_ID = 4;
+
+reserveIdRange('partners', partners.length);
+reserveIdRange('partner_locations', partnerLocations.length);
+reserveIdRange('roles', roles.length);

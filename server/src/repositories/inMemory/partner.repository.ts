@@ -8,7 +8,7 @@ export class InMemoryPartnerRepository implements PartnerRepository {
     return partner;
   }
 
-  async update(id: string, patch: Partial<Partner>): Promise<Partner> {
+  async update(id: number, patch: Partial<Partner>): Promise<Partner> {
     const existing = tables.partners.get(id);
     if (!existing) {
       throw Object.assign(new Error(`Partner ${id} not found`), { status: 404 });
@@ -18,7 +18,7 @@ export class InMemoryPartnerRepository implements PartnerRepository {
     return updated;
   }
 
-  async findById(id: string): Promise<Partner | undefined> {
+  async findById(id: number): Promise<Partner | undefined> {
     return tables.partners.get(id);
   }
 

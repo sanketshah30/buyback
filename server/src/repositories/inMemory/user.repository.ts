@@ -1,15 +1,16 @@
-import { v4 as uuid } from 'uuid';
 import { User } from '../../types/domain';
+import { nextId } from '../../utils/idGenerator';
 import { UserRepository } from '../interfaces';
-import { tables } from './db';
+import { indexes, tables } from './db';
+import { addToIndex, getIndexed, removeFromIndex } from './indexUtils';
 
 export class InMemoryUserRepository implements UserRepository {
   async findByMobile(mobile: string): Promise<User | undefined> {
-    const id = tables.usersByMobile.get(mobile);
-    return id ? tables.users.get(id) : undefined;
+    const id = indexes.usersByMobile.get(mobile);
+    return id !== undefined ? tables.users.get(id) : undefined;
   }
 
-  async findById(id: string): Promise<User | undefined> {
+  async findById(id: number): Promise<User | undefined> {
     return tables.users.get(id);
   }
 
@@ -27,7 +28,7 @@ export class InMemoryUserRepository implements UserRepository {
   ): Promise<User> {
     const now = new Date().toISOString();
     const user: User = {
-      id: uuid(),
+      id: nextId('users'),
       mobile,
       createdAt: now,
       updatedAt: now,
@@ -35,26 +36,34 @@ export class InMemoryUserRepository implements UserRepository {
       ...extra,
     };
     tables.users.set(user.id, user);
-    tables.usersByMobile.set(mobile, user.id);
+    indexes.usersByMobile.set(mobile, user.id);
+    if (user.partnerLocationId !== undefined) {
+      addToIndex(indexes.usersByPartnerLocationId, user.partnerLocationId, user.id);
+    }
     return user;
   }
 
-  async update(id: string, patch: Partial<User>): Promise<User> {
+  async update(id: number, patch: Partial<User>): Promise<User> {
     const existing = tables.users.get(id);
     if (!existing) {
       throw Object.assign(new Error(`User ${id} not found`), { status: 404 });
     }
-    const updated: User = { ...existing, ...patch, updatedAt: new Date().toISOString() };
+    const updated: User = { ...existing, ...patch, id: existing.id, updatedAt: new Date().toISOString() };
     tables.users.set(id, updated);
+
     if (patch.mobile && patch.mobile !== existing.mobile) {
-      tables.usersByMobile.delete(existing.mobile);
-      tables.usersByMobile.set(patch.mobile, id);
+      indexes.usersByMobile.delete(existing.mobile);
+      indexes.usersByMobile.set(patch.mobile, id);
+    }
+    if ('partnerLocationId' in patch && patch.partnerLocationId !== existing.partnerLocationId) {
+      if (existing.partnerLocationId !== undefined) removeFromIndex(indexes.usersByPartnerLocationId, existing.partnerLocationId, id);
+      if (updated.partnerLocationId !== undefined) addToIndex(indexes.usersByPartnerLocationId, updated.partnerLocationId, id);
     }
     return updated;
   }
 
-  async listByLocation(partnerLocationId: string): Promise<User[]> {
-    return Array.from(tables.users.values()).filter((u) => u.partnerLocationId === partnerLocationId && u.isActive);
+  async listByLocation(partnerLocationId: number): Promise<User[]> {
+    return getIndexed(indexes.usersByPartnerLocationId, partnerLocationId, tables.users).filter((u) => u.isActive);
   }
 
   async list(filter?: { isActive?: boolean }): Promise<User[]> {

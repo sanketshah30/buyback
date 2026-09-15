@@ -4,6 +4,7 @@ import path from 'path';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
 import { uploadsRootDir } from '../middleware/upload.middleware';
 import { buybackRepository } from '../repositories';
+import { parseId } from '../utils/parseId';
 
 export const uploadsRouter = Router();
 
@@ -26,7 +27,8 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
 // buyback the file belongs to, before streaming a single file back.
 uploadsRouter.get('/:buybackId/:filename', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
-    const request = await buybackRepository.findById(req.params.buybackId);
+    const buybackId = parseId(req.params.buybackId);
+    const request = buybackId !== undefined ? await buybackRepository.findById(buybackId) : undefined;
     if (!request || request.userId !== req.auth!.userId) {
       return res.status(404).json({ error: 'Not found' });
     }

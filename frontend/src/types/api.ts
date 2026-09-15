@@ -3,7 +3,7 @@
 // extracting a shared `packages/types` workspace once the API stabilizes.
 
 export interface BaseEntity {
-  id: string;
+  id: number;
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
@@ -22,21 +22,21 @@ export interface Brand extends BaseEntity {
 }
 
 export interface Product extends BaseEntity {
-  categoryId: string;
-  brandId: string;
+  categoryId: number;
+  brandId: number;
   name: string;
   basePrice: number;
 }
 
 export interface Sku extends BaseEntity {
-  productId: string;
+  productId: number;
   code: string;
   label: string;
   priceModifier: number;
 }
 
 export interface SkuAlias extends BaseEntity {
-  skuId: string;
+  skuId: number;
   partnerId: string;
   partnerSkuName: string;
 }
@@ -51,7 +51,7 @@ export interface QuestionOption {
 
 export interface Question {
   id: string;
-  categoryId: string;
+  categoryId: number;
   text: string;
   type: QuestionType;
   options: QuestionOption[];
@@ -107,9 +107,9 @@ export interface CustomerInfo {
 }
 
 export interface BuybackRequest {
-  id: string;
+  id: number;
   displayId?: string;
-  userId: string;
+  userId: number;
   status: BuybackStatus;
   category?: Category;
   brand?: Brand;
@@ -135,7 +135,7 @@ export interface BuybackRequest {
 }
 
 export interface User {
-  id: string;
+  id: number;
   mobile: string;
   name?: string;
   createdAt: string;

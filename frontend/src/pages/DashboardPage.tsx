@@ -91,7 +91,7 @@ export function DashboardPage() {
               <Card
                 key={request.id}
                 interactive
-                onClick={() => navigate((RESUME_ROUTE[request.status] ?? (() => '/'))(request.id))}
+                onClick={() => navigate((RESUME_ROUTE[request.status] ?? (() => '/'))(String(request.id)))}
               >
                 <div className="dashboard-list__row">
                   <div>

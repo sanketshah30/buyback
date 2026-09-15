@@ -1,13 +1,14 @@
 import { Router } from 'express';
-import { v4 as uuid } from 'uuid';
 import { requireAuth } from '../middleware/auth.middleware';
 import { partnerLocationRepository, partnerRepository } from '../repositories';
 import { PartnerLocation } from '../types/domain';
+import { nextId } from '../utils/idGenerator';
+import { parseId } from '../utils/parseId';
 
 export const partnerLocationsRouter = Router();
 partnerLocationsRouter.use(requireAuth);
 
-function validateLocationBody(body: Partial<PartnerLocation>): string | null {
+function validateLocationBody(body: { partnerId?: number } & Partial<PartnerLocation>): string | null {
   if (!body.partnerId) return 'partnerId is required';
   if (!body.name) return 'name is required';
   if (!body.address) return 'address is required';
@@ -22,7 +23,8 @@ function validateLocationBody(body: Partial<PartnerLocation>): string | null {
 // List/search is POST + body, never GET + query string - see server/README.md.
 partnerLocationsRouter.post('/search', async (req, res, next) => {
   try {
-    const { partnerId, isActive } = req.body as { partnerId?: string; isActive?: boolean };
+    const partnerId = parseId(req.body?.partnerId);
+    const { isActive } = req.body as { isActive?: boolean };
     const locations = partnerId
       ? await partnerLocationRepository.listByPartner(partnerId)
       : await partnerLocationRepository.list({ isActive });
@@ -35,11 +37,12 @@ partnerLocationsRouter.post('/search', async (req, res, next) => {
 
 partnerLocationsRouter.post('/', async (req, res, next) => {
   try {
-    const body = req.body as Partial<PartnerLocation>;
+    const partnerId = parseId(req.body?.partnerId);
+    const body = { ...(req.body as Partial<PartnerLocation>), partnerId };
     const error = validateLocationBody(body);
     if (error) return res.status(400).json({ error });
 
-    const partner = await partnerRepository.findById(body.partnerId!);
+    const partner = await partnerRepository.findById(partnerId!);
     if (!partner) return res.status(404).json({ error: 'Unknown partnerId' });
 
     const existing = await partnerLocationRepository.findByUniqueIdentifier(body.uniqueIdentifier!);
@@ -49,8 +52,8 @@ partnerLocationsRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const location: PartnerLocation = {
-      id: uuid(),
-      partnerId: body.partnerId!,
+      id: nextId('partner_locations'),
+      partnerId: partnerId!,
       name: body.name!,
       address: body.address!,
       city: body.city!,
@@ -71,7 +74,8 @@ partnerLocationsRouter.post('/', async (req, res, next) => {
 
 partnerLocationsRouter.get('/:id', async (req, res, next) => {
   try {
-    const location = await partnerLocationRepository.findById(req.params.id);
+    const id = parseId(req.params.id);
+    const location = id !== undefined ? await partnerLocationRepository.findById(id) : undefined;
     if (!location) return res.status(404).json({ error: 'Partner location not found' });
     return res.json(location);
   } catch (err) {
@@ -81,12 +85,14 @@ partnerLocationsRouter.get('/:id', async (req, res, next) => {
 
 partnerLocationsRouter.patch('/:id', async (req, res, next) => {
   try {
-    const existing = await partnerLocationRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Partner location not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await partnerLocationRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'Partner location not found' });
 
-    const body = req.body as Partial<PartnerLocation>;
-    if (body.partnerId && body.partnerId !== existing.partnerId) {
-      const partner = await partnerRepository.findById(body.partnerId);
+    const patchPartnerId = req.body?.partnerId !== undefined ? parseId(req.body.partnerId) : undefined;
+    const body = { ...(req.body as Partial<PartnerLocation>), partnerId: patchPartnerId };
+    if (patchPartnerId !== undefined && patchPartnerId !== existing.partnerId) {
+      const partner = await partnerRepository.findById(patchPartnerId);
       if (!partner) return res.status(404).json({ error: 'Unknown partnerId' });
     }
     if (body.uniqueIdentifier && body.uniqueIdentifier !== existing.uniqueIdentifier) {
@@ -94,8 +100,9 @@ partnerLocationsRouter.patch('/:id', async (req, res, next) => {
       if (clash) return res.status(409).json({ error: `A location with uniqueIdentifier "${body.uniqueIdentifier}" already exists` });
     }
 
-    const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...patch } = body;
-    const updated = await partnerLocationRepository.update(req.params.id, patch);
+    const { id: _ignoredId, createdAt: _ignoredCreatedAt, partnerId: _ignoredPartnerId, ...rest } = body;
+    const patch = { ...rest, ...(patchPartnerId !== undefined ? { partnerId: patchPartnerId } : {}) };
+    const updated = await partnerLocationRepository.update(id, patch);
     return res.json(updated);
   } catch (err) {
     return next(err);

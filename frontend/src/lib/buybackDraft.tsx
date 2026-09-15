@@ -53,7 +53,7 @@ export function BuybackDraftProvider({ children }: { children: ReactNode }) {
   // Tracks a partially-created backend record across retries, so retrying a
   // failed submission resumes from the right step instead of creating a
   // duplicate buyback request.
-  const createdIdRef = useRef<string | undefined>(undefined);
+  const createdIdRef = useRef<number | undefined>(undefined);
 
   const setCategoryBrand = useCallback((category: Category, brand: Brand) => {
     setDraft((prev) => ({ ...prev, category, brand }));
@@ -96,24 +96,25 @@ export function BuybackDraftProvider({ children }: { children: ReactNode }) {
 
     let request: BuybackRequest;
     if (createdIdRef.current) {
-      request = await buybackApi.get(createdIdRef.current);
+      request = await buybackApi.get(String(createdIdRef.current));
     } else {
       request = await buybackApi.create(draft.category.id, draft.brand.id);
       createdIdRef.current = request.id;
     }
 
-    request = await buybackApi.setDevice(request.id, draft.identifier.value);
-    request = await buybackApi.setProduct(request.id, draft.product.id, draft.sku.id);
+    const id = String(request.id);
+    request = await buybackApi.setDevice(id, draft.identifier.value);
+    request = await buybackApi.setProduct(id, draft.product.id, draft.sku.id);
 
     if (draft.assessmentMethod === 'questionnaire') {
-      request = await buybackApi.submitQuestionnaire(request.id, draft.questionnaireAnswers ?? []);
+      request = await buybackApi.submitQuestionnaire(id, draft.questionnaireAnswers ?? []);
     } else if (draft.assessmentMethod === 'image') {
-      request = await buybackApi.submitImages(request.id, draft.assessmentImages ?? []);
+      request = await buybackApi.submitImages(id, draft.assessmentImages ?? []);
     } else if (draft.assessmentMethod === 'video' && draft.assessmentVideo) {
-      request = await buybackApi.submitVideo(request.id, draft.assessmentVideo);
+      request = await buybackApi.submitVideo(id, draft.assessmentVideo);
     }
 
-    request = await buybackApi.runValuation(request.id);
+    request = await buybackApi.runValuation(id);
     return request;
   }, [draft]);
 

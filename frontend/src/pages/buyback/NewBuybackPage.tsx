@@ -33,11 +33,14 @@ export function NewBuybackPage() {
 
   const [activeSection, setActiveSection] = useState<SectionKey>(draft.category && draft.brand ? (draft.identifier ? 'product' : 'device') : 'category');
 
-  // Section 1: category + brand
+  // Section 1: category + brand. IDs are numeric in the domain model, but this
+  // custom Select component's dropdown value is always a string - converted
+  // back to a number only when calling the API / comparing against the
+  // fetched Category/Brand/Product/Sku objects.
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [categoryId, setCategoryId] = useState(draft.category?.id ?? '');
-  const [brandId, setBrandId] = useState(draft.brand?.id ?? '');
+  const [categoryId, setCategoryId] = useState(draft.category ? String(draft.category.id) : '');
+  const [brandId, setBrandId] = useState(draft.brand ? String(draft.brand.id) : '');
 
   // Section 2: device identifier
   const [deviceValue, setDeviceValue] = useState(draft.identifier?.value ?? '');
@@ -45,8 +48,8 @@ export function NewBuybackPage() {
   // Section 3: product details
   const [products, setProducts] = useState<Product[]>([]);
   const [skus, setSkus] = useState<Sku[]>([]);
-  const [productId, setProductId] = useState(draft.product?.id ?? '');
-  const [skuId, setSkuId] = useState(draft.sku?.id ?? '');
+  const [productId, setProductId] = useState(draft.product ? String(draft.product.id) : '');
+  const [skuId, setSkuId] = useState(draft.sku ? String(draft.sku.id) : '');
 
   useEffect(() => {
     catalogApi.listCategories().then(setCategories);
@@ -57,7 +60,7 @@ export function NewBuybackPage() {
       setBrands([]);
       return;
     }
-    catalogApi.listBrands(categoryId).then(setBrands);
+    catalogApi.listBrands(Number(categoryId)).then(setBrands);
   }, [categoryId]);
 
   useEffect(() => {
@@ -65,7 +68,7 @@ export function NewBuybackPage() {
       setProducts([]);
       return;
     }
-    catalogApi.listProducts(categoryId, brandId).then(setProducts);
+    catalogApi.listProducts(Number(categoryId), Number(brandId)).then(setProducts);
   }, [categoryId, brandId]);
 
   useEffect(() => {
@@ -73,13 +76,13 @@ export function NewBuybackPage() {
       setSkus([]);
       return;
     }
-    catalogApi.listSkus(productId).then(setSkus);
+    catalogApi.listSkus(Number(productId)).then(setSkus);
   }, [productId]);
 
-  const selectedCategory = categories.find((c) => c.id === categoryId) ?? draft.category;
-  const selectedBrand = brands.find((b) => b.id === brandId) ?? draft.brand;
-  const selectedProduct = products.find((p) => p.id === productId);
-  const selectedSku = skus.find((s) => s.id === skuId);
+  const selectedCategory = categories.find((c) => String(c.id) === categoryId) ?? draft.category;
+  const selectedBrand = brands.find((b) => String(b.id) === brandId) ?? draft.brand;
+  const selectedProduct = products.find((p) => String(p.id) === productId);
+  const selectedSku = skus.find((s) => String(s.id) === skuId);
   const isSmartphone = selectedCategory?.type === 'smartphone';
   const deviceValid = isSmartphone ? /^\d{16}$/.test(deviceValue) : /^[a-zA-Z0-9]{12,16}$/.test(deviceValue);
 
@@ -87,8 +90,8 @@ export function NewBuybackPage() {
   // valuation step, so sections advance instantly with no network round-trip.
   useEffect(() => {
     if (activeSection !== 'category' || !categoryId || !brandId) return;
-    const category = categories.find((c) => c.id === categoryId);
-    const brand = brands.find((b) => b.id === brandId);
+    const category = categories.find((c) => String(c.id) === categoryId);
+    const brand = brands.find((b) => String(b.id) === brandId);
     if (!category || !brand) return;
     setCategoryBrand(category, brand);
     setActiveSection('device');
@@ -165,7 +168,7 @@ export function NewBuybackPage() {
               setCategoryId(value);
               setBrandId('');
             }}
-            options={categories.map((cat) => ({ value: cat.id, label: cat.name }))}
+            options={categories.map((cat) => ({ value: String(cat.id), label: cat.name }))}
           />
           <Select
             label="Brand"
@@ -173,7 +176,7 @@ export function NewBuybackPage() {
             value={brandId}
             onChange={setBrandId}
             disabled={!categoryId}
-            options={brands.map((b) => ({ value: b.id, label: b.name }))}
+            options={brands.map((b) => ({ value: String(b.id), label: b.name }))}
           />
         </AccordionSection>
 
@@ -234,7 +237,7 @@ export function NewBuybackPage() {
               setProductId(value);
               setSkuId('');
             }}
-            options={products.map((p) => ({ value: p.id, label: p.name }))}
+            options={products.map((p) => ({ value: String(p.id), label: p.name }))}
           />
 
           <Select
@@ -243,7 +246,7 @@ export function NewBuybackPage() {
             value={skuId}
             onChange={setSkuId}
             disabled={!productId}
-            options={skus.map((s) => ({ value: s.id, label: s.label }))}
+            options={skus.map((s) => ({ value: String(s.id), label: s.label }))}
           />
         </AccordionSection>
       </div>

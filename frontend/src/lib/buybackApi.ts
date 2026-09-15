@@ -10,11 +10,11 @@ export interface CustomerOtpResponse {
 export const buybackApi = {
   list: () => api.get<BuybackRequest[]>('/api/buyback'),
   get: (id: string) => api.get<BuybackRequest>(`/api/buyback/${id}`),
-  create: (categoryId: string, brandId: string) =>
+  create: (categoryId: number, brandId: number) =>
     api.post<BuybackRequest>('/api/buyback', { categoryId, brandId }),
   setDevice: (id: string, value: string) =>
     api.patch<BuybackRequest>(`/api/buyback/${id}/device`, { value }),
-  setProduct: (id: string, productId: string, skuId: string) =>
+  setProduct: (id: string, productId: number, skuId: number) =>
     api.patch<BuybackRequest>(`/api/buyback/${id}/product`, { productId, skuId }),
   submitQuestionnaire: (id: string, answers: QuestionnaireAnswer[]) =>
     api.post<BuybackRequest>(`/api/buyback/${id}/assessment/questionnaire`, { answers }),

@@ -1,5 +1,4 @@
 import { NextFunction, Response, Router } from 'express';
-import { v4 as uuid } from 'uuid';
 import { catalogRepository, buybackRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { toPublicUrl, upload } from '../middleware/upload.middleware';
@@ -10,6 +9,8 @@ import { notificationService } from '../services/notification.service';
 import { applyDiagnosisAdjustment, applyNoDiagnosisDrop, computeMaxValue } from '../services/valuation.service';
 import { BuybackRequest, QuestionnaireAnswer } from '../types/domain';
 import { dateKey, formatBuybackDisplayId } from '../utils/id';
+import { nextId } from '../utils/idGenerator';
+import { parseId } from '../utils/parseId';
 
 export const buybackRouter = Router();
 buybackRouter.use(requireAuth);
@@ -17,7 +18,11 @@ buybackRouter.use(requireAuth);
 const IMEI_REGEX = /^[0-9]{16}$/;
 const SERIAL_REGEX = /^[a-zA-Z0-9]{12,16}$/;
 
-async function loadOwnedBuyback(id: string, userId: string): Promise<BuybackRequest> {
+async function loadOwnedBuyback(rawId: string, userId: number): Promise<BuybackRequest> {
+  const id = parseId(rawId);
+  if (id === undefined) {
+    throw Object.assign(new Error('Invalid buyback id'), { status: 400 });
+  }
   const request = await buybackRepository.findById(id);
   if (!request || request.userId !== userId) {
     throw Object.assign(new Error('Buyback request not found'), { status: 404 });
@@ -50,7 +55,8 @@ buybackRouter.get('/', async (req: AuthedRequest, res, next) => {
 
 buybackRouter.post('/', async (req: AuthedRequest, res, next) => {
   try {
-    const { categoryId, brandId } = req.body as { categoryId?: string; brandId?: string };
+    const categoryId = parseId(req.body?.categoryId);
+    const brandId = parseId(req.body?.brandId);
     if (!categoryId || !brandId) {
       return res.status(400).json({ error: 'categoryId and brandId are required' });
     }
@@ -62,7 +68,7 @@ buybackRouter.post('/', async (req: AuthedRequest, res, next) => {
 
     const now = new Date().toISOString();
     const request: BuybackRequest = {
-      id: uuid(),
+      id: nextId('buyback_requests'),
       userId: req.auth!.userId,
       status: 'draft',
       category,
@@ -114,7 +120,8 @@ buybackRouter.patch('/:id/device', async (req: AuthedRequest, res, next) => {
 buybackRouter.patch('/:id/product', async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-    const { productId, skuId } = req.body as { productId?: string; skuId?: string };
+    const productId = parseId(req.body?.productId);
+    const skuId = parseId(req.body?.skuId);
     if (!productId || !skuId) return res.status(400).json({ error: 'productId and skuId are required' });
     if (!request.category || !request.brand) {
       return res.status(400).json({ error: 'Select a category and brand first' });

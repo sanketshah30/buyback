@@ -1,11 +1,17 @@
 /**
- * Every persisted catalog entity carries the standard audit columns
- * (`id`, `createdAt`, `updatedAt`, `isActive`) so this maps cleanly onto real
- * SQL tables later - `isActive` doubles as a soft-delete flag instead of
- * hard-deleting rows that historical buybacks may still reference.
+ * Every persisted entity carries the standard audit columns (`id`,
+ * `createdAt`, `updatedAt`, `isActive`) so this maps cleanly onto real SQL
+ * tables later - `isActive` doubles as a soft-delete flag instead of
+ * hard-deleting rows that other tables may still reference.
+ *
+ * `id` is a sequential integer (never a UUID) on every table, matching a
+ * real SQL `INT AUTO_INCREMENT PRIMARY KEY` column - see
+ * `src/utils/idGenerator.ts` for how new rows get their ID in this
+ * in-memory mock, and `src/repositories/inMemory/db.ts` for the indexes
+ * maintained alongside each table's primary Map.
  */
 export interface BaseEntity {
-  id: string;
+  id: number;
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
@@ -32,20 +38,22 @@ export interface Brand extends BaseEntity {
 /**
  * Table: products
  * FKs: categoryId -> product_categories.id, brandId -> brands.id
+ * Indexed on (categoryId, brandId) - the app always looks products up by
+ * that pair when a user drills into a specific brand's lineup.
  */
 export interface Product extends BaseEntity {
-  categoryId: string;
-  brandId: string;
+  categoryId: number;
+  brandId: number;
   name: string;
   basePrice: number;
 }
 
 /**
  * Table: skus
- * FK: productId -> products.id
+ * FK: productId -> products.id (indexed - SKUs are always looked up per product)
  */
 export interface Sku extends BaseEntity {
-  productId: string;
+  productId: number;
   code: string;
   label: string;
   priceModifier: number;
@@ -55,11 +63,13 @@ export interface Sku extends BaseEntity {
  * Table: sku_aliases
  * Maps a reselling/trade-in partner's own SKU naming onto our canonical SKU,
  * so inbound partner feeds can be resolved without the partner needing to
- * know our internal SKU IDs.
- * FK: skuId -> skus.id
+ * know our internal SKU IDs. `partnerId` here is that external partner's own
+ * identifier/code (e.g. "cashify") - not a FK into our `partners` table,
+ * since a SKU-feed partner need not be one of our onboarded buyback partners.
+ * FK: skuId -> skus.id (indexed)
  */
 export interface SkuAlias extends BaseEntity {
-  skuId: string;
+  skuId: number;
   partnerId: string;
   partnerSkuName: string;
 }
@@ -73,9 +83,18 @@ export interface QuestionOption {
   valueImpactPercent: number;
 }
 
+/**
+ * The buyback flow's current hardcoded, per-category questionnaire (see
+ * `src/data/catalog.seed.ts`). This is inline configuration embedded
+ * directly in a buyback record, not a normalized relational table, so -
+ * unlike every table above/below - its `id`/`categoryId`/option `id`s stay
+ * as semantic string codes (e.g. "yes", "none") rather than integers; they
+ * are being superseded by the `MasterQuestion`/`QuestionnaireConfig` module
+ * further down once that's wired into the live flow.
+ */
 export interface Question {
   id: string;
-  categoryId: string;
+  categoryId: number;
   text: string;
   type: QuestionType;
   options: QuestionOption[];
@@ -130,10 +149,11 @@ export interface CustomerInfo {
   mobile: string;
 }
 
+/** Table: buyback_requests. FK: userId -> users.id (indexed - history is always looked up per user). */
 export interface BuybackRequest {
-  id: string;
+  id: number;
   displayId?: string;
-  userId: string;
+  userId: number;
   status: BuybackStatus;
   category?: Category;
   brand?: Brand;
@@ -172,14 +192,15 @@ export interface BuybackRequest {
  * onboarded with `username`/`email` and assigned to a location. Both kinds
  * authenticate through the same mobile+OTP flow - see auth.service.ts.
  * FK: partnerLocationId -> partner_locations.id (a user's *current* location;
- * changes are tracked in `UserLocationHistory` below).
+ * changes are tracked in `UserLocationHistory` below). Indexed on `mobile`
+ * (the OTP login lookup key) and on `partnerLocationId`.
  */
 export interface User extends BaseEntity {
   mobile: string;
   name?: string;
   username?: string;
   email?: string;
-  partnerLocationId?: string;
+  partnerLocationId?: number;
 }
 
 export type PartnerType = 'vendor' | 'retailer';
@@ -189,6 +210,7 @@ export type PartnerType = 'vendor' | 'retailer';
  * The business entity on either side of a buyback: a "retailer" is a
  * customer-facing purchase partner (e.g. a BestBuy storefront brand) and a
  * "vendor" is who collected devices are sold on to (e.g. a refurbisher).
+ * Indexed on `uniqueIdentifier` (enforced-unique business/merchant code).
  */
 export interface Partner extends BaseEntity {
   name: string;
@@ -205,11 +227,12 @@ export interface Partner extends BaseEntity {
 /**
  * Table: partner_locations
  * An individual physical location of a partner (e.g. "BestBuy New York").
- * FK: partnerId -> partners.id. Many locations can belong to one partner;
- * each location belongs to exactly one partner.
+ * FK: partnerId -> partners.id (indexed). Many locations can belong to one
+ * partner; each location belongs to exactly one partner. Also indexed on
+ * `uniqueIdentifier`.
  */
 export interface PartnerLocation extends BaseEntity {
-  partnerId: string;
+  partnerId: number;
   name: string;
   address: string;
   city: string;
@@ -235,24 +258,24 @@ export interface Role extends BaseEntity {
 /**
  * Table: user_roles
  * Many-to-many mapping - one user can hold multiple roles.
- * FKs: userId -> users.id, roleId -> roles.id
+ * FKs: userId -> users.id (indexed), roleId -> roles.id
  */
 export interface UserRole extends BaseEntity {
-  userId: string;
-  roleId: string;
+  userId: number;
+  roleId: number;
 }
 
 /**
  * Table: user_location_history
  * Every time a user's current location (users.partnerLocationId) changes,
  * an entry is recorded here - append-only audit trail, never mutated.
- * FKs: userId -> users.id, fromPartnerLocationId/toPartnerLocationId -> partner_locations.id
+ * FKs: userId -> users.id (indexed), fromPartnerLocationId/toPartnerLocationId -> partner_locations.id
  */
 export interface UserLocationHistory extends BaseEntity {
-  userId: string;
-  fromPartnerLocationId?: string;
-  toPartnerLocationId?: string;
-  changedByUserId?: string;
+  userId: number;
+  fromPartnerLocationId?: number;
+  toPartnerLocationId?: number;
+  changedByUserId?: number;
 }
 
 /**
@@ -278,21 +301,21 @@ export interface MasterQuestion extends BaseEntity {
   type: QuestionType;
 }
 
-/** Table: question_translations. FK: questionId -> questions.id */
+/** Table: question_translations. FK: questionId -> questions.id (indexed). */
 export interface QuestionTranslation extends BaseEntity {
-  questionId: string;
+  questionId: number;
   language: string;
   text: string;
 }
 
-/** Table: answers. `code` is a stable, language-independent key (e.g. "yes", "charger") for programmatic reference (e.g. by the future valuation engine). */
+/** Table: answers. `code` is a stable, language-independent key (e.g. "yes", "charger") for programmatic reference (e.g. by the future valuation engine). Indexed on `code`. */
 export interface MasterAnswer extends BaseEntity {
   code: string;
 }
 
-/** Table: answer_translations. FK: answerId -> answers.id */
+/** Table: answer_translations. FK: answerId -> answers.id (indexed). */
 export interface AnswerTranslation extends BaseEntity {
-  answerId: string;
+  answerId: number;
   language: string;
   text: string;
 }
@@ -300,11 +323,11 @@ export interface AnswerTranslation extends BaseEntity {
 /**
  * Table: question_answer_mapping
  * A single row = "this Answer is a valid, selectable option for this Question".
- * FKs: questionId -> questions.id, answerId -> answers.id
+ * FKs: questionId -> questions.id (indexed), answerId -> answers.id
  */
 export interface QuestionAnswerMapping extends BaseEntity {
-  questionId: string;
-  answerId: string;
+  questionId: number;
+  answerId: number;
 }
 
 /**
@@ -314,33 +337,41 @@ export interface QuestionAnswerMapping extends BaseEntity {
  * order (`sequence`) the underlying question appears.
  *
  * `brandId`/`partnerId` are `null` to mean "applies to all" (the spec's
- * "0" sentinel, adapted since Category/Brand/Partner IDs here are the real
- * string IDs from the catalog/partner-onboarding modules, not integers).
- * Resolution precedence (most to least specific), all requiring an exact
- * Category match: (1) exact brand + exact partner, (2) wildcard brand +
- * exact partner, (3) exact brand + wildcard partner, (4) wildcard brand +
- * wildcard partner. Partner-specificity outranks brand-specificity when
- * only one of the two is specific - see CatalogRepository-style
- * `resolveQuestionnaire()` in the repository layer for the implementation.
+ * "0" sentinel, adapted to `null` since these are real integer FKs and 0 is
+ * not a reserved/invalid ID here). Resolution precedence (most to least
+ * specific), all requiring an exact Category match: (1) exact brand + exact
+ * partner, (2) wildcard brand + exact partner, (3) exact brand + wildcard
+ * partner, (4) wildcard brand + wildcard partner. Partner-specificity
+ * outranks brand-specificity when only one of the two is specific - see
+ * `QuestionnaireConfigRepository.resolve()` in the repository layer.
  *
- * FKs: productCategoryId -> product_categories.id (required),
+ * FKs: productCategoryId -> product_categories.id (required, indexed),
  * brandId -> brands.id (nullable), partnerId -> partners.id (nullable),
- * questionAnswerId -> question_answer_mapping.id
+ * questionAnswerId -> question_answer_mapping.id. Indexed on
+ * (productCategoryId, brandId, partnerId) as a composite, matching exactly
+ * how `resolve()` queries it.
  */
 export interface QuestionnaireConfig extends BaseEntity {
-  productCategoryId: string;
-  brandId: string | null;
-  partnerId: string | null;
-  questionAnswerId: string;
+  productCategoryId: number;
+  brandId: number | null;
+  partnerId: number | null;
+  questionAnswerId: number;
   sequence: number;
 }
 
 export interface OtpChallenge {
+  /**
+   * Opaque, unguessable request handle handed to the client - deliberately
+   * kept as a random string token (like a session nonce) rather than a
+   * sequential integer, since unlike every table above this is never
+   * joined/FK'd from another table and a predictable ID here would let a
+   * client enumerate other users' in-flight OTP challenges.
+   */
   requestId: string;
   mobile: string;
   code: string;
   purpose: 'login' | 'buyback-confirmation';
-  buybackId?: string;
+  buybackId?: number;
   expiresAt: string;
   verified: boolean;
   /** Failed verify attempts against this challenge - locked out after too many. */

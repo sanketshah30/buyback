@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { verifyToken } from '../utils/jwt';
 
 export interface AuthedRequest extends Request {
-  auth?: { userId: string; mobile: string };
+  auth?: { userId: number; mobile: string };
 }
 
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {

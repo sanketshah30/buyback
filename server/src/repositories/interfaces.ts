@@ -34,11 +34,11 @@ import {
 
 export interface UserRepository {
   findByMobile(mobile: string): Promise<User | undefined>;
-  findById(id: string): Promise<User | undefined>;
+  findById(id: number): Promise<User | undefined>;
   /** `extra` lets partner/vendor onboarding set username/email/location up front; plain OTP self-signup only ever passes `mobile`. */
   create(mobile: string, extra?: Partial<Pick<User, 'username' | 'email' | 'name' | 'partnerLocationId'>>): Promise<User>;
-  update(id: string, patch: Partial<User>): Promise<User>;
-  listByLocation(partnerLocationId: string): Promise<User[]>;
+  update(id: number, patch: Partial<User>): Promise<User>;
+  listByLocation(partnerLocationId: number): Promise<User[]>;
   list(filter?: { isActive?: boolean }): Promise<User[]>;
   findByUsername(username: string): Promise<User | undefined>;
   findByEmail(email: string): Promise<User | undefined>;
@@ -57,110 +57,110 @@ export interface CatalogRepository {
    * brands that have at least one active product listed under this category -
    * the equivalent of `SELECT DISTINCT b.* FROM brands b JOIN products p ON
    * p.brand_id = b.id WHERE p.category_id = ? AND p.is_active`. */
-  listBrandsByCategory(categoryId: string): Promise<Brand[]>;
-  listProducts(categoryId: string, brandId: string): Promise<Product[]>;
-  listSkus(productId: string): Promise<Sku[]>;
-  listSkuAliases(skuId: string): Promise<SkuAlias[]>;
-  getCategory(categoryId: string): Promise<Category | undefined>;
-  getBrand(brandId: string): Promise<Brand | undefined>;
-  getProduct(productId: string): Promise<Product | undefined>;
-  getSku(skuId: string): Promise<Sku | undefined>;
-  listQuestions(categoryId: string): Promise<Question[]>;
+  listBrandsByCategory(categoryId: number): Promise<Brand[]>;
+  listProducts(categoryId: number, brandId: number): Promise<Product[]>;
+  listSkus(productId: number): Promise<Sku[]>;
+  listSkuAliases(skuId: number): Promise<SkuAlias[]>;
+  getCategory(categoryId: number): Promise<Category | undefined>;
+  getBrand(brandId: number): Promise<Brand | undefined>;
+  getProduct(productId: number): Promise<Product | undefined>;
+  getSku(skuId: number): Promise<Sku | undefined>;
+  listQuestions(categoryId: number): Promise<Question[]>;
 }
 
 export interface BuybackRepository {
   create(request: BuybackRequest): Promise<BuybackRequest>;
-  findById(id: string): Promise<BuybackRequest | undefined>;
-  update(id: string, patch: Partial<BuybackRequest>): Promise<BuybackRequest>;
-  listByUser(userId: string): Promise<BuybackRequest[]>;
+  findById(id: number): Promise<BuybackRequest | undefined>;
+  update(id: number, patch: Partial<BuybackRequest>): Promise<BuybackRequest>;
+  listByUser(userId: number): Promise<BuybackRequest[]>;
   nextDailySequence(dateKey: string): Promise<number>;
 }
 
 export interface PartnerRepository {
   create(partner: Partner): Promise<Partner>;
-  update(id: string, patch: Partial<Partner>): Promise<Partner>;
-  findById(id: string): Promise<Partner | undefined>;
+  update(id: number, patch: Partial<Partner>): Promise<Partner>;
+  findById(id: number): Promise<Partner | undefined>;
   findByUniqueIdentifier(uniqueIdentifier: string): Promise<Partner | undefined>;
   list(filter?: { isActive?: boolean; partnerType?: PartnerType }): Promise<Partner[]>;
 }
 
 export interface PartnerLocationRepository {
   create(location: PartnerLocation): Promise<PartnerLocation>;
-  update(id: string, patch: Partial<PartnerLocation>): Promise<PartnerLocation>;
-  findById(id: string): Promise<PartnerLocation | undefined>;
+  update(id: number, patch: Partial<PartnerLocation>): Promise<PartnerLocation>;
+  findById(id: number): Promise<PartnerLocation | undefined>;
   findByUniqueIdentifier(uniqueIdentifier: string): Promise<PartnerLocation | undefined>;
-  listByPartner(partnerId: string): Promise<PartnerLocation[]>;
+  listByPartner(partnerId: number): Promise<PartnerLocation[]>;
   list(filter?: { isActive?: boolean }): Promise<PartnerLocation[]>;
 }
 
 export interface RoleRepository {
   create(role: Role): Promise<Role>;
-  update(id: string, patch: Partial<Role>): Promise<Role>;
-  findById(id: string): Promise<Role | undefined>;
+  update(id: number, patch: Partial<Role>): Promise<Role>;
+  findById(id: number): Promise<Role | undefined>;
   list(filter?: { isActive?: boolean }): Promise<Role[]>;
 }
 
 export interface UserRoleRepository {
   assign(userRole: UserRole): Promise<UserRole>;
   /** Soft-revokes the assignment (isActive=false) rather than deleting the row, preserving the audit trail. */
-  revoke(userId: string, roleId: string): Promise<void>;
-  listByUser(userId: string): Promise<UserRole[]>;
-  findActive(userId: string, roleId: string): Promise<UserRole | undefined>;
+  revoke(userId: number, roleId: number): Promise<void>;
+  listByUser(userId: number): Promise<UserRole[]>;
+  findActive(userId: number, roleId: number): Promise<UserRole | undefined>;
 }
 
 export interface UserLocationHistoryRepository {
   record(entry: UserLocationHistory): Promise<UserLocationHistory>;
-  listByUser(userId: string): Promise<UserLocationHistory[]>;
+  listByUser(userId: number): Promise<UserLocationHistory[]>;
 }
 
 export interface MasterQuestionRepository {
   create(question: MasterQuestion): Promise<MasterQuestion>;
-  update(id: string, patch: Partial<MasterQuestion>): Promise<MasterQuestion>;
-  findById(id: string): Promise<MasterQuestion | undefined>;
+  update(id: number, patch: Partial<MasterQuestion>): Promise<MasterQuestion>;
+  findById(id: number): Promise<MasterQuestion | undefined>;
   list(filter?: { isActive?: boolean }): Promise<MasterQuestion[]>;
 }
 
 export interface QuestionTranslationRepository {
   upsert(translation: QuestionTranslation): Promise<QuestionTranslation>;
-  listByQuestion(questionId: string): Promise<QuestionTranslation[]>;
-  find(questionId: string, language: string): Promise<QuestionTranslation | undefined>;
+  listByQuestion(questionId: number): Promise<QuestionTranslation[]>;
+  find(questionId: number, language: string): Promise<QuestionTranslation | undefined>;
 }
 
 export interface MasterAnswerRepository {
   create(answer: MasterAnswer): Promise<MasterAnswer>;
-  update(id: string, patch: Partial<MasterAnswer>): Promise<MasterAnswer>;
-  findById(id: string): Promise<MasterAnswer | undefined>;
+  update(id: number, patch: Partial<MasterAnswer>): Promise<MasterAnswer>;
+  findById(id: number): Promise<MasterAnswer | undefined>;
   findByCode(code: string): Promise<MasterAnswer | undefined>;
   list(filter?: { isActive?: boolean }): Promise<MasterAnswer[]>;
 }
 
 export interface AnswerTranslationRepository {
   upsert(translation: AnswerTranslation): Promise<AnswerTranslation>;
-  listByAnswer(answerId: string): Promise<AnswerTranslation[]>;
-  find(answerId: string, language: string): Promise<AnswerTranslation | undefined>;
+  listByAnswer(answerId: number): Promise<AnswerTranslation[]>;
+  find(answerId: number, language: string): Promise<AnswerTranslation | undefined>;
 }
 
 export interface QuestionAnswerMappingRepository {
   create(mapping: QuestionAnswerMapping): Promise<QuestionAnswerMapping>;
-  update(id: string, patch: Partial<QuestionAnswerMapping>): Promise<QuestionAnswerMapping>;
-  findById(id: string): Promise<QuestionAnswerMapping | undefined>;
-  listByQuestion(questionId: string): Promise<QuestionAnswerMapping[]>;
+  update(id: number, patch: Partial<QuestionAnswerMapping>): Promise<QuestionAnswerMapping>;
+  findById(id: number): Promise<QuestionAnswerMapping | undefined>;
+  listByQuestion(questionId: number): Promise<QuestionAnswerMapping[]>;
   list(filter?: { isActive?: boolean }): Promise<QuestionAnswerMapping[]>;
 }
 
 export interface ResolvedQuestionnaireQuestion {
-  questionId: string;
+  questionId: number;
   type: MasterQuestion['type'];
   sequence: number;
   text: string;
-  answers: { answerId: string; code: string; text: string }[];
+  answers: { answerId: number; code: string; text: string }[];
 }
 
 export interface QuestionnaireConfigRepository {
   create(config: QuestionnaireConfig): Promise<QuestionnaireConfig>;
-  update(id: string, patch: Partial<QuestionnaireConfig>): Promise<QuestionnaireConfig>;
-  findById(id: string): Promise<QuestionnaireConfig | undefined>;
-  list(filter?: { productCategoryId?: string; brandId?: string | null; partnerId?: string | null; isActive?: boolean }): Promise<QuestionnaireConfig[]>;
+  update(id: number, patch: Partial<QuestionnaireConfig>): Promise<QuestionnaireConfig>;
+  findById(id: number): Promise<QuestionnaireConfig | undefined>;
+  list(filter?: { productCategoryId?: number; brandId?: number | null; partnerId?: number | null; isActive?: boolean }): Promise<QuestionnaireConfig[]>;
   /**
    * Core resolution: given a required productCategoryId and optional
    * brandId/partnerId, finds the single most-specific matching tier (see
@@ -169,5 +169,5 @@ export interface QuestionnaireConfigRepository {
    * `language` (falling back to "en" when a translation is missing).
    * Returns an empty array when no tier matches at all (e.g. unknown category).
    */
-  resolve(productCategoryId: string, brandId: string | undefined, partnerId: string | undefined, language: string): Promise<ResolvedQuestionnaireQuestion[]>;
+  resolve(productCategoryId: number, brandId: number | undefined, partnerId: number | undefined, language: string): Promise<ResolvedQuestionnaireQuestion[]>;
 }

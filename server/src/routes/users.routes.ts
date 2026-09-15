@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { v4 as uuid } from 'uuid';
 import { requireAuth } from '../middleware/auth.middleware';
 import {
   partnerLocationRepository,
@@ -8,6 +7,8 @@ import {
   userRepository,
   userRoleRepository,
 } from '../repositories';
+import { nextId } from '../utils/idGenerator';
+import { parseId } from '../utils/parseId';
 
 export const usersRouter = Router();
 usersRouter.use(requireAuth);
@@ -17,7 +18,8 @@ const MOBILE_REGEX = /^[0-9]{10}$/;
 // List/search is POST + body, never GET + query string - see server/README.md.
 usersRouter.post('/search', async (req, res, next) => {
   try {
-    const { partnerLocationId, isActive } = req.body as { partnerLocationId?: string; isActive?: boolean };
+    const partnerLocationId = parseId(req.body?.partnerLocationId);
+    const { isActive } = req.body as { isActive?: boolean };
     const users = partnerLocationId
       ? await userRepository.listByLocation(partnerLocationId)
       : await userRepository.list({ isActive });
@@ -37,19 +39,22 @@ usersRouter.post('/search', async (req, res, next) => {
  */
 usersRouter.post('/', async (req, res, next) => {
   try {
-    const { mobile, username, email, name, partnerLocationId, roleIds } = req.body as {
+    const { mobile, username, email, name, roleIds } = req.body as {
       mobile?: string;
       username?: string;
       email?: string;
       name?: string;
-      partnerLocationId?: string;
-      roleIds?: string[];
+      roleIds?: unknown[];
     };
+    const partnerLocationId = req.body?.partnerLocationId !== undefined ? parseId(req.body.partnerLocationId) : undefined;
 
     if (!mobile || !MOBILE_REGEX.test(mobile)) {
       return res.status(400).json({ error: 'A valid 10-digit mobile number is required' });
     }
-    if (partnerLocationId) {
+    if (req.body?.partnerLocationId !== undefined && partnerLocationId === undefined) {
+      return res.status(400).json({ error: 'partnerLocationId must be a valid integer id' });
+    }
+    if (partnerLocationId !== undefined) {
       const location = await partnerLocationRepository.findById(partnerLocationId);
       if (!location) return res.status(404).json({ error: 'Unknown partnerLocationId' });
     }
@@ -74,9 +79,9 @@ usersRouter.post('/', async (req, res, next) => {
       user = await userRepository.create(mobile, { username, email, name, partnerLocationId });
     }
 
-    if (partnerLocationId && partnerLocationId !== previousLocationId) {
+    if (partnerLocationId !== undefined && partnerLocationId !== previousLocationId) {
       await userLocationHistoryRepository.record({
-        id: uuid(),
+        id: nextId('user_location_history'),
         userId: user.id,
         fromPartnerLocationId: previousLocationId,
         toPartnerLocationId: partnerLocationId,
@@ -87,13 +92,15 @@ usersRouter.post('/', async (req, res, next) => {
     }
 
     if (roleIds?.length) {
-      for (const roleId of roleIds) {
+      for (const rawRoleId of roleIds) {
+        const roleId = parseId(rawRoleId);
+        if (roleId === undefined) return res.status(400).json({ error: `Invalid roleId "${rawRoleId}"` });
         const role = await roleRepository.findById(roleId);
         if (!role) return res.status(404).json({ error: `Unknown roleId "${roleId}"` });
         const existingAssignment = await userRoleRepository.findActive(user.id, roleId);
         if (!existingAssignment) {
           await userRoleRepository.assign({
-            id: uuid(),
+            id: nextId('user_roles'),
             userId: user.id,
             roleId,
             createdAt: new Date().toISOString(),
@@ -112,7 +119,8 @@ usersRouter.post('/', async (req, res, next) => {
 
 usersRouter.get('/:id', async (req, res, next) => {
   try {
-    const user = await userRepository.findById(req.params.id);
+    const id = parseId(req.params.id);
+    const user = id !== undefined ? await userRepository.findById(id) : undefined;
     if (!user) return res.status(404).json({ error: 'User not found' });
     return res.json(user);
   } catch (err) {
@@ -122,8 +130,9 @@ usersRouter.get('/:id', async (req, res, next) => {
 
 usersRouter.patch('/:id', async (req, res, next) => {
   try {
-    const existing = await userRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await userRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'User not found' });
 
     const { username, email, name, isActive } = req.body as {
       username?: string;
@@ -140,7 +149,7 @@ usersRouter.patch('/:id', async (req, res, next) => {
       if (clash && clash.id !== existing.id) return res.status(409).json({ error: `Email "${email}" is already in use` });
     }
 
-    const updated = await userRepository.update(req.params.id, { username, email, name, isActive });
+    const updated = await userRepository.update(id, { username, email, name, isActive });
     return res.json(updated);
   } catch (err) {
     return next(err);
@@ -155,10 +164,12 @@ usersRouter.patch('/:id', async (req, res, next) => {
  */
 usersRouter.post('/:id/location', async (req, res, next) => {
   try {
-    const existing = await userRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await userRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'User not found' });
 
-    const { partnerLocationId, changedByUserId } = req.body as { partnerLocationId?: string; changedByUserId?: string };
+    const partnerLocationId = parseId(req.body?.partnerLocationId);
+    const changedByUserId = req.body?.changedByUserId !== undefined ? parseId(req.body.changedByUserId) : undefined;
     if (!partnerLocationId) return res.status(400).json({ error: 'partnerLocationId is required' });
 
     const location = await partnerLocationRepository.findById(partnerLocationId);
@@ -169,9 +180,9 @@ usersRouter.post('/:id/location', async (req, res, next) => {
       return res.json(existing);
     }
 
-    const updated = await userRepository.update(req.params.id, { partnerLocationId });
+    const updated = await userRepository.update(id, { partnerLocationId });
     await userLocationHistoryRepository.record({
-      id: uuid(),
+      id: nextId('user_location_history'),
       userId: existing.id,
       fromPartnerLocationId: previousLocationId,
       toPartnerLocationId: partnerLocationId,
@@ -189,9 +200,10 @@ usersRouter.post('/:id/location', async (req, res, next) => {
 
 usersRouter.get('/:id/location-history', async (req, res, next) => {
   try {
-    const existing = await userRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
-    const history = await userLocationHistoryRepository.listByUser(req.params.id);
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await userRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'User not found' });
+    const history = await userLocationHistoryRepository.listByUser(id);
     return res.json(history);
   } catch (err) {
     return next(err);
@@ -200,9 +212,10 @@ usersRouter.get('/:id/location-history', async (req, res, next) => {
 
 usersRouter.get('/:id/roles', async (req, res, next) => {
   try {
-    const existing = await userRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
-    const assignments = await userRoleRepository.listByUser(req.params.id);
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await userRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'User not found' });
+    const assignments = await userRoleRepository.listByUser(id);
     const roles = await Promise.all(assignments.map((a) => roleRepository.findById(a.roleId)));
     return res.json(roles.filter(Boolean));
   } catch (err) {
@@ -212,10 +225,11 @@ usersRouter.get('/:id/roles', async (req, res, next) => {
 
 usersRouter.post('/:id/roles', async (req, res, next) => {
   try {
-    const existing = await userRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await userRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'User not found' });
 
-    const { roleId } = req.body as { roleId?: string };
+    const roleId = parseId(req.body?.roleId);
     if (!roleId) return res.status(400).json({ error: 'roleId is required' });
     const role = await roleRepository.findById(roleId);
     if (!role) return res.status(404).json({ error: 'Unknown roleId' });
@@ -224,7 +238,7 @@ usersRouter.post('/:id/roles', async (req, res, next) => {
     if (alreadyAssigned) return res.status(200).json(alreadyAssigned);
 
     const assignment = await userRoleRepository.assign({
-      id: uuid(),
+      id: nextId('user_roles'),
       userId: existing.id,
       roleId,
       createdAt: new Date().toISOString(),
@@ -239,9 +253,11 @@ usersRouter.post('/:id/roles', async (req, res, next) => {
 
 usersRouter.delete('/:id/roles/:roleId', async (req, res, next) => {
   try {
-    const existing = await userRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
-    await userRoleRepository.revoke(req.params.id, req.params.roleId);
+    const id = parseId(req.params.id);
+    const roleId = parseId(req.params.roleId);
+    const existing = id !== undefined ? await userRepository.findById(id) : undefined;
+    if (!existing || id === undefined || roleId === undefined) return res.status(404).json({ error: 'User not found' });
+    await userRoleRepository.revoke(id, roleId);
     return res.status(204).send();
   } catch (err) {
     return next(err);

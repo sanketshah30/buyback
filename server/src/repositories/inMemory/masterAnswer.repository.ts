@@ -8,7 +8,7 @@ export class InMemoryMasterAnswerRepository implements MasterAnswerRepository {
     return answer;
   }
 
-  async update(id: string, patch: Partial<MasterAnswer>): Promise<MasterAnswer> {
+  async update(id: number, patch: Partial<MasterAnswer>): Promise<MasterAnswer> {
     const existing = tables.masterAnswers.get(id);
     if (!existing) {
       throw Object.assign(new Error(`Answer ${id} not found`), { status: 404 });
@@ -18,7 +18,7 @@ export class InMemoryMasterAnswerRepository implements MasterAnswerRepository {
     return updated;
   }
 
-  async findById(id: string): Promise<MasterAnswer | undefined> {
+  async findById(id: number): Promise<MasterAnswer | undefined> {
     return tables.masterAnswers.get(id);
   }
 

@@ -56,6 +56,6 @@ export const upload = multer({
   fileFilter,
 });
 
-export function toPublicUrl(buybackId: string, filename: string): string {
+export function toPublicUrl(buybackId: number, filename: string): string {
   return `/api/uploads/${buybackId}/${filename}`;
 }

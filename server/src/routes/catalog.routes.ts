@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { catalogRepository } from '../repositories';
+import { parseId } from '../utils/parseId';
 
 export const catalogRouter = Router();
 
@@ -24,7 +25,7 @@ catalogRouter.post('/categories', async (_req, res, next) => {
 
 catalogRouter.post('/brands', async (req, res, next) => {
   try {
-    const { categoryId } = req.body as { categoryId?: string };
+    const categoryId = parseId(req.body?.categoryId);
     if (!categoryId) return res.status(400).json({ error: 'categoryId is required' });
     return res.json(await catalogRepository.listBrandsByCategory(categoryId));
   } catch (err) {
@@ -34,7 +35,8 @@ catalogRouter.post('/brands', async (req, res, next) => {
 
 catalogRouter.post('/products', async (req, res, next) => {
   try {
-    const { categoryId, brandId } = req.body as { categoryId?: string; brandId?: string };
+    const categoryId = parseId(req.body?.categoryId);
+    const brandId = parseId(req.body?.brandId);
     if (!categoryId || !brandId) {
       return res.status(400).json({ error: 'categoryId and brandId are required' });
     }
@@ -46,7 +48,7 @@ catalogRouter.post('/products', async (req, res, next) => {
 
 catalogRouter.post('/skus', async (req, res, next) => {
   try {
-    const { productId } = req.body as { productId?: string };
+    const productId = parseId(req.body?.productId);
     if (!productId) return res.status(400).json({ error: 'productId is required' });
     return res.json(await catalogRepository.listSkus(productId));
   } catch (err) {
@@ -56,7 +58,7 @@ catalogRouter.post('/skus', async (req, res, next) => {
 
 catalogRouter.post('/sku-aliases', async (req, res, next) => {
   try {
-    const { skuId } = req.body as { skuId?: string };
+    const skuId = parseId(req.body?.skuId);
     if (!skuId) return res.status(400).json({ error: 'skuId is required' });
     return res.json(await catalogRepository.listSkuAliases(skuId));
   } catch (err) {
@@ -66,7 +68,7 @@ catalogRouter.post('/sku-aliases', async (req, res, next) => {
 
 catalogRouter.post('/questions', async (req, res, next) => {
   try {
-    const { categoryId } = req.body as { categoryId?: string };
+    const categoryId = parseId(req.body?.categoryId);
     if (!categoryId) return res.status(400).json({ error: 'categoryId is required' });
     return res.json(await catalogRepository.listQuestions(categoryId));
   } catch (err) {

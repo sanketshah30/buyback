@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { v4 as uuid } from 'uuid';
 import { requireAuth } from '../middleware/auth.middleware';
 import { masterAnswerRepository, masterQuestionRepository, questionAnswerMappingRepository } from '../repositories';
 import { QuestionAnswerMapping } from '../types/domain';
+import { nextId } from '../utils/idGenerator';
+import { parseId } from '../utils/parseId';
 
 export const questionAnswersRouter = Router();
 questionAnswersRouter.use(requireAuth);
@@ -10,7 +11,8 @@ questionAnswersRouter.use(requireAuth);
 // List/search is POST + body, never GET + query string - see server/README.md.
 questionAnswersRouter.post('/search', async (req, res, next) => {
   try {
-    const { questionId, isActive } = req.body as { questionId?: string; isActive?: boolean };
+    const questionId = parseId(req.body?.questionId);
+    const { isActive } = req.body as { isActive?: boolean };
     const mappings = questionId
       ? await questionAnswerMappingRepository.listByQuestion(questionId)
       : await questionAnswerMappingRepository.list({ isActive });
@@ -22,7 +24,8 @@ questionAnswersRouter.post('/search', async (req, res, next) => {
 
 questionAnswersRouter.post('/', async (req, res, next) => {
   try {
-    const { questionId, answerId } = req.body as { questionId?: string; answerId?: string };
+    const questionId = parseId(req.body?.questionId);
+    const answerId = parseId(req.body?.answerId);
     if (!questionId || !answerId) return res.status(400).json({ error: 'questionId and answerId are required' });
 
     const question = await masterQuestionRepository.findById(questionId);
@@ -35,7 +38,7 @@ questionAnswersRouter.post('/', async (req, res, next) => {
     if (duplicate) return res.status(200).json(duplicate);
 
     const now = new Date().toISOString();
-    const mapping: QuestionAnswerMapping = { id: uuid(), questionId, answerId, createdAt: now, updatedAt: now, isActive: true };
+    const mapping: QuestionAnswerMapping = { id: nextId('question_answer_mapping'), questionId, answerId, createdAt: now, updatedAt: now, isActive: true };
     await questionAnswerMappingRepository.create(mapping);
     return res.status(201).json(mapping);
   } catch (err) {
@@ -45,7 +48,8 @@ questionAnswersRouter.post('/', async (req, res, next) => {
 
 questionAnswersRouter.get('/:id', async (req, res, next) => {
   try {
-    const mapping = await questionAnswerMappingRepository.findById(req.params.id);
+    const id = parseId(req.params.id);
+    const mapping = id !== undefined ? await questionAnswerMappingRepository.findById(id) : undefined;
     if (!mapping) return res.status(404).json({ error: 'Question-answer mapping not found' });
     return res.json(mapping);
   } catch (err) {
@@ -55,11 +59,12 @@ questionAnswersRouter.get('/:id', async (req, res, next) => {
 
 questionAnswersRouter.patch('/:id', async (req, res, next) => {
   try {
-    const existing = await questionAnswerMappingRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Question-answer mapping not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await questionAnswerMappingRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'Question-answer mapping not found' });
 
     const { isActive } = req.body as { isActive?: boolean };
-    const updated = await questionAnswerMappingRepository.update(req.params.id, { isActive });
+    const updated = await questionAnswerMappingRepository.update(id, { isActive });
     return res.json(updated);
   } catch (err) {
     return next(err);

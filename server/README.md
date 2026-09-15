@@ -21,9 +21,13 @@ src/
   repositories/           Data-access interfaces + in-memory implementation
     interfaces.ts          <- contracts a future MySQL implementation must satisfy
     inMemory/               <- current mock implementation (Maps in process memory)
+      db.ts                  <- the "database": primary Maps + secondary indexes (see below)
+      indexUtils.ts           <- tiny helper for maintaining a secondary index
   services/               Business logic (auth/OTP, valuation, AI-mock assessment, diagnosis, notifications)
   middleware/              Auth guard, file upload (multer), error handling
-  routes/                  Express routers: auth, catalog, buyback
+  routes/                  Express routers: auth, catalog, buyback, partners, users, questions, ...
+  utils/idGenerator.ts     Auto-increment integer ID generator (every table's PK)
+  utils/parseId.ts         Validates/coerces a route param or body value into a positive integer PK
   app.ts / index.ts        Express app wiring + bootstrap
 ```
 
@@ -34,6 +38,54 @@ src/
 3. Wire the new implementations into `src/repositories/index.ts` behind that flag.
 
 No route or service code needs to change - they only depend on the repository interfaces.
+
+## Primary keys & indexing
+
+**Every table's primary key is a sequential integer** (`INT AUTO_INCREMENT PRIMARY KEY`,
+never a UUID or a human-readable slug) - `src/utils/idGenerator.ts` hands out the next ID
+per table name, and seed data (`src/data/*.seed.ts`) pre-assigns sequential IDs starting
+at 1, then calls `reserveIdRange()` so IDs created afterward via the API keep counting up
+without colliding with seeded rows. Foreign keys are typed `number` end to end (server
+domain types, repository interfaces, route bodies, and the frontend's mirrored types) -
+`src/utils/parseId.ts` validates/coerces every route param and request-body ID field into
+a positive integer before it touches a repository, rejecting anything else with `400`.
+
+Two exceptions, both deliberate:
+- `OtpChallenge.requestId` stays an opaque random string (like a session token) - it's
+  never a FK target from another table, and a predictable sequential ID here would let a
+  client enumerate other users' in-flight OTP challenges.
+- The buyback flow's hardcoded, per-category `Question`/`QuestionOption` (in
+  `catalog.seed.ts`) keep semantic string codes (e.g. `"yes"`, `"none"`) since they're
+  inline config embedded in a buyback record, not a normalized table, and are being
+  superseded by the questionnaire-config module below.
+
+**Every table is indexed** on its primary key (the in-memory store's primary `Map<number,
+T>` for that table is the equivalent of a clustered index) plus every foreign key / column
+that's actually queried by, via a secondary index maintained in `src/repositories/inMemory/db.ts`
+(`indexes.*`, a `Map<key, Set<id>>` kept in sync by each repository's create/update
+methods - see `indexUtils.ts`). This turns what would otherwise be a linear `.filter()`
+scan into an O(1) lookup, matching exactly what a real `CREATE INDEX` statement would do
+once this moves to MySQL:
+
+| Index | Matches SQL |
+| --- | --- |
+| `usersByMobile` (unique) | `CREATE UNIQUE INDEX idx_users_mobile ON users(mobile)` |
+| `usersByPartnerLocationId` | `CREATE INDEX idx_users_partner_location ON users(partner_location_id)` |
+| `buybackRequestsByUserId` | `CREATE INDEX idx_buyback_requests_user ON buyback_requests(user_id)` |
+| `partnerLocationsByPartnerId` | `CREATE INDEX idx_partner_locations_partner ON partner_locations(partner_id)` |
+| `userRolesByUserId` | `CREATE INDEX idx_user_roles_user ON user_roles(user_id)` |
+| `userLocationHistoryByUserId` | `CREATE INDEX idx_user_location_history_user ON user_location_history(user_id)` |
+| `productsByCategory` / `productsByCategoryAndBrand` | `CREATE INDEX idx_products_category ON products(category_id)` / `CREATE INDEX idx_products_category_brand ON products(category_id, brand_id)` |
+| `skusByProductId` | `CREATE INDEX idx_skus_product ON skus(product_id)` |
+| `skuAliasesBySkuId` | `CREATE INDEX idx_sku_aliases_sku ON sku_aliases(sku_id)` |
+| `questionTranslationsByQuestionId` | `CREATE INDEX idx_question_translations_question ON question_translations(question_id)` |
+| `answerTranslationsByAnswerId` | `CREATE INDEX idx_answer_translations_answer ON answer_translations(answer_id)` |
+| `questionAnswerMappingsByQuestionId` | `CREATE INDEX idx_qam_question ON question_answer_mapping(question_id)` |
+| `questionnaireConfigsByProfile` / `...ByCategory` | `CREATE INDEX idx_questionnaire_config_profile ON questionnaire_config(product_category_id, brand_id, partner_id)` |
+
+`QuestionnaireConfigRepository.resolve()` is the best example of this paying off: each of
+its 4 precedence tiers is a single composite-index lookup (`questionnaireConfigsByProfile`),
+never a scan over every config row.
 
 ## Catalog module (categories, brands, products, SKUs, SKU aliases)
 
@@ -141,10 +193,10 @@ English if a translation is missing).
 
 **Resolution rule** (`POST /api/questionnaire-config/resolve`): Product Category is always
 required and matched exactly (never a wildcard). Brand/Partner are optional - `null` in
-the database means "applies to all" (adapted from the spec's `0` sentinel, since these
-reference the catalog/partner-onboarding modules' real string IDs rather than integers).
-Given an input category (+ optional brand/partner), the **single most specific matching
-tier wins** - ties are never blended:
+the database means "applies to all" (the spec's `0` sentinel, adapted to `null` since
+these are real integer FKs and `0` isn't a reserved/invalid ID here). Given an input
+category (+ optional brand/partner), the **single most specific matching tier wins** -
+ties are never blended:
 
 1. Category exact + Brand exact + Partner exact
 2. Category exact + Brand **wildcard** + Partner exact (partner-specificity beats brand-specificity)

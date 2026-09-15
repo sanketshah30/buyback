@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { v4 as uuid } from 'uuid';
 import { requireAuth } from '../middleware/auth.middleware';
 import { masterQuestionRepository, questionTranslationRepository } from '../repositories';
 import { MasterQuestion, QuestionType } from '../types/domain';
+import { nextId } from '../utils/idGenerator';
+import { parseId } from '../utils/parseId';
 
 export const questionsRouter = Router();
 questionsRouter.use(requireAuth);
@@ -28,13 +29,13 @@ questionsRouter.post('/', async (req, res, next) => {
     }
 
     const now = new Date().toISOString();
-    const question: MasterQuestion = { id: uuid(), type, createdAt: now, updatedAt: now, isActive: true };
+    const question: MasterQuestion = { id: nextId('questions'), type, createdAt: now, updatedAt: now, isActive: true };
     await masterQuestionRepository.create(question);
 
     for (const t of translations ?? []) {
       if (!t.language || !t.text) continue;
       await questionTranslationRepository.upsert({
-        id: uuid(),
+        id: nextId('question_translations'),
         questionId: question.id,
         language: t.language,
         text: t.text,
@@ -52,7 +53,8 @@ questionsRouter.post('/', async (req, res, next) => {
 
 questionsRouter.get('/:id', async (req, res, next) => {
   try {
-    const question = await masterQuestionRepository.findById(req.params.id);
+    const id = parseId(req.params.id);
+    const question = id !== undefined ? await masterQuestionRepository.findById(id) : undefined;
     if (!question) return res.status(404).json({ error: 'Question not found' });
     return res.json(question);
   } catch (err) {
@@ -62,15 +64,16 @@ questionsRouter.get('/:id', async (req, res, next) => {
 
 questionsRouter.patch('/:id', async (req, res, next) => {
   try {
-    const existing = await masterQuestionRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Question not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await masterQuestionRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'Question not found' });
 
     const { type, isActive } = req.body as { type?: QuestionType; isActive?: boolean };
     if (type && !QUESTION_TYPES.includes(type)) {
       return res.status(400).json({ error: `type must be one of: ${QUESTION_TYPES.join(', ')}` });
     }
 
-    const updated = await masterQuestionRepository.update(req.params.id, { type, isActive });
+    const updated = await masterQuestionRepository.update(id, { type, isActive });
     return res.json(updated);
   } catch (err) {
     return next(err);
@@ -79,7 +82,9 @@ questionsRouter.patch('/:id', async (req, res, next) => {
 
 questionsRouter.get('/:id/translations', async (req, res, next) => {
   try {
-    const translations = await questionTranslationRepository.listByQuestion(req.params.id);
+    const id = parseId(req.params.id);
+    if (id === undefined) return res.status(404).json({ error: 'Question not found' });
+    const translations = await questionTranslationRepository.listByQuestion(id);
     return res.json(translations);
   } catch (err) {
     return next(err);
@@ -88,16 +93,17 @@ questionsRouter.get('/:id/translations', async (req, res, next) => {
 
 questionsRouter.post('/:id/translations', async (req, res, next) => {
   try {
-    const existing = await masterQuestionRepository.findById(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Question not found' });
+    const id = parseId(req.params.id);
+    const existing = id !== undefined ? await masterQuestionRepository.findById(id) : undefined;
+    if (!existing || id === undefined) return res.status(404).json({ error: 'Question not found' });
 
     const { language, text } = req.body as { language?: string; text?: string };
     if (!language || !text) return res.status(400).json({ error: 'language and text are required' });
 
     const now = new Date().toISOString();
     const translation = await questionTranslationRepository.upsert({
-      id: uuid(),
-      questionId: req.params.id,
+      id: nextId('question_translations'),
+      questionId: id,
       language,
       text,
       createdAt: now,
