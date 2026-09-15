@@ -25,7 +25,7 @@ By default `frontend/.env` leaves `VITE_API_BASE_URL` empty, so all `/api/*` and
 
 ## Why mock data?
 
-`server/src/repositories` defines the data-access **interfaces** the rest of the app depends on (`UserRepository`, `OtpRepository`, `CatalogRepository`, `BuybackRepository`). The only implementation shipped today is `inMemory/*`, backed by plain JS `Map`s that reset on restart. To move to MySQL:
+`server/src/repositories` defines the data-access **interfaces** the rest of the app depends on (`UserRepository`, `OtpRepository`, `CatalogRepository`, `BuybackRepository`, `PartnerRepository`, `PartnerLocationRepository`, `RoleRepository`, `UserRoleRepository`, `UserLocationHistoryRepository`). The only implementation shipped today is `inMemory/*`, backed by plain JS `Map`s that reset on restart. To move to MySQL:
 
 1. Implement the same interfaces against `mysql2` (or an ORM like Prisma/Kysely).
 2. Flip `DATA_DRIVER=mysql` in `server/.env` and fill in the `DB_*` values.
@@ -70,10 +70,21 @@ on the product row instead. See the "Catalog module" section in `server/README.m
 the full table breakdown and the reasoning behind using `POST + body` instead of
 `GET + query string` for every catalog lookup.
 
+## Partner/vendor onboarding module
+
+Backend-only for now (no frontend UI yet): a normalized `Partner -> Partner Location ->
+User -> Role` hierarchy for onboarding the retailers/vendors and their staff who operate
+the buyback flow, with full CRUD APIs and a dedicated location-change endpoint that logs
+an audit trail every time a user moves between locations. It deliberately reuses the same
+`User` table/login as buyback customers rather than a separate entity - see the "Partner/
+vendor onboarding module" section in `server/README.md` for the full design rationale and
+API reference.
+
 ## Known MVP simplifications (documented for whoever wires up production)
 
 - All data lives in server memory and resets on restart - see "Why mock data?" above.
 - The category/IMEI/product/assessment steps are held in frontend memory only (`frontend/src/lib/buybackDraft.tsx`) until valuation - if the browser tab is closed or hard-refreshed before that point, that in-progress draft is lost (there's nothing to resume, by design). Once a buyback reaches valuation, it's a real, resumable backend record.
+- Partner/vendor onboarding APIs are unauthorized-by-default: any authenticated user can call them today. `Role.rights` establishes the permission model but no middleware enforces it yet - see the "Partner/vendor onboarding module" section in `server/README.md`.
 - OTP delivery, SMS and email are logged to the server console instead of hitting a real gateway.
 - "Scan barcode" is simulated (fills a random valid IMEI/serial) rather than using a live camera barcode scanner.
 - AI image/video assessment deterministically maps uploads to questionnaire answers instead of calling a real vision model.

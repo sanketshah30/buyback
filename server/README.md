@@ -61,6 +61,50 @@ pure reads; POST is used purely as the transport (browsers' `fetch()`/`XHR` don'
 body on `GET`/`HEAD` anyway, so this is also the only option that works from the frontend
 as-is).
 
+## Partner/vendor onboarding module
+
+A normalized hierarchy for onboarding the businesses (and their staff) that operate the
+buyback flow on the ground, seeded with mock data in `src/data/partner.seed.ts` but -
+unlike the read-only product catalog - **fully mutable via CRUD APIs**, since onboarding
+new partners/locations/users/roles is the point of this module:
+
+```
+Partner ──1:N──▶ PartnerLocation ──1:N──▶ User ──N:M──▶ Role
+ (business)         (a store/site)      (staff, via   (via UserRole
+                                        current           mapping)
+                                     partnerLocationId)
+```
+
+| Table | Description | Foreign keys |
+| --- | --- | --- |
+| `partners` | The business entity on either side of a buyback - a **retailer** is a customer-facing purchase partner (e.g. a BestBuy storefront), a **vendor** is who collected devices are sold on to (e.g. a refurbisher) | - |
+| `partner_locations` | An individual physical location of a partner (e.g. "BestBuy New York") | `partnerId` → partners.id |
+| `users` | **The same `User` table used for buyback-customer OTP login** (see below) - a user's `partnerLocationId` is their *current* location | `partnerLocationId` → partner_locations.id |
+| `roles` | Master list of roles (Partner Admin, Promoter, Vendor Admin, ...); `rights` is a structured list of permission-key strings (e.g. `manage_locations`) rather than free text | - |
+| `user_roles` | Many-to-many: one user can hold multiple roles | `userId` → users.id, `roleId` → roles.id |
+| `user_location_history` | Append-only audit log - a new row is written every time a user's current location changes | `userId` → users.id, `fromPartnerLocationId`/`toPartnerLocationId` → partner_locations.id |
+
+**Why `User` is shared with buyback customers, not a separate table:** partner/vendor
+staff (promoters, admins) are just as much "users of the app" as buyback customers - they
+authenticate through the exact same mobile+OTP flow (`src/services/auth.service.ts`).
+Onboarding a staff member (`POST /api/users`) is an **upsert keyed by mobile number**: if
+that mobile already has a plain customer `User` row (from a previous OTP login), it's
+updated in place with `username`/`email`/`partnerLocationId`/roles rather than erroring,
+since a person's login identity and their staff profile are the same record. The next
+time they log in via OTP, `findByMobile` naturally finds that same, now-enriched, record.
+
+**Location changes are tracked deliberately**, not just via a general profile update:
+`POST /api/users/:id/location` is the one sanctioned way to move a user day-to-day, and it
+always writes a `user_location_history` row recording the from/to location. The general
+`PATCH /api/users/:id` only touches profile fields (username/email/name/isActive), not
+location, to keep that audit trail meaningful.
+
+**Authorization is data-modeled but not yet enforced**: `Role.rights` gives every role a
+structured permission list, but no middleware currently checks a caller's rights before
+allowing a mutation (e.g. anyone authenticated can call `POST /api/partners`) - this MVP
+only establishes the schema for that; wiring up actual authorization checks against
+`rights` is a follow-up.
+
 ## Mock behaviors to know about
 
 - **OTP**: always `123456` (configurable via `MOCK_OTP_CODE`) and echoed back in API responses as `devOtp` for easy testing (no real SMS/email gateway is wired up). SMS/email "sends" are logged to the server console. Verification is rate-limited to 5 incorrect attempts per OTP request before it's locked out.
@@ -99,8 +143,29 @@ as-is).
 | `POST /api/buyback/:id/product-images` | Upload 6-side images (only required for the questionnaire path; enforced again at confirm time) |
 | `POST /api/buyback/:id/confirm` | Confirm the buyback - moves it into history |
 | `GET /api/uploads/:buybackId/:filename` | Fetch an uploaded file - requires auth + ownership of that buyback |
+| `POST /api/partners` | Create a partner |
+| `PATCH /api/partners/:id` | Update a partner |
+| `GET /api/partners/:id` | Fetch a partner |
+| `POST /api/partners/search` | List/filter partners (body: `{ isActive?, partnerType? }`) |
+| `POST /api/partner-locations` | Create a partner location (body includes `partnerId`) |
+| `PATCH /api/partner-locations/:id` | Update a partner location |
+| `GET /api/partner-locations/:id` | Fetch a partner location |
+| `POST /api/partner-locations/search` | List/filter locations (body: `{ partnerId?, isActive? }`) |
+| `POST /api/roles` | Create a role |
+| `PATCH /api/roles/:id` | Update a role |
+| `GET /api/roles/:id` | Fetch a role |
+| `POST /api/roles/search` | List/filter roles (body: `{ isActive? }`) |
+| `POST /api/users` | Onboard a partner/vendor staff user (upsert by mobile; body may include `partnerLocationId` and `roleIds`) |
+| `PATCH /api/users/:id` | Update a user's profile fields (not location - see below) |
+| `GET /api/users/:id` | Fetch a user |
+| `POST /api/users/search` | List/filter users (body: `{ partnerLocationId?, isActive? }`) |
+| `POST /api/users/:id/location` | Change a user's current location - always logs a `user_location_history` entry |
+| `GET /api/users/:id/location-history` | List a user's location-change history |
+| `GET /api/users/:id/roles` | List a user's currently-assigned roles |
+| `POST /api/users/:id/roles` | Assign a role to a user |
+| `DELETE /api/users/:id/roles/:roleId` | Revoke a role from a user |
 
-All `/api/buyback/*` and `/api/uploads/*` routes require `Authorization: Bearer <token>` from the OTP login flow.
+All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, and `/api/users/*` routes require `Authorization: Bearer <token>` from the OTP login flow.
 
 ### When does a buyback record actually get created?
 

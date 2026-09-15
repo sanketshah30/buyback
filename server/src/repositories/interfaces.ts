@@ -3,11 +3,17 @@ import {
   BuybackRequest,
   Category,
   OtpChallenge,
+  Partner,
+  PartnerLocation,
+  PartnerType,
   Product,
   Question,
+  Role,
   Sku,
   SkuAlias,
   User,
+  UserLocationHistory,
+  UserRole,
 } from '../types/domain';
 
 /**
@@ -23,7 +29,13 @@ import {
 export interface UserRepository {
   findByMobile(mobile: string): Promise<User | undefined>;
   findById(id: string): Promise<User | undefined>;
-  create(mobile: string): Promise<User>;
+  /** `extra` lets partner/vendor onboarding set username/email/location up front; plain OTP self-signup only ever passes `mobile`. */
+  create(mobile: string, extra?: Partial<Pick<User, 'username' | 'email' | 'name' | 'partnerLocationId'>>): Promise<User>;
+  update(id: string, patch: Partial<User>): Promise<User>;
+  listByLocation(partnerLocationId: string): Promise<User[]>;
+  list(filter?: { isActive?: boolean }): Promise<User[]>;
+  findByUsername(username: string): Promise<User | undefined>;
+  findByEmail(email: string): Promise<User | undefined>;
 }
 
 export interface OtpRepository {
@@ -56,4 +68,41 @@ export interface BuybackRepository {
   update(id: string, patch: Partial<BuybackRequest>): Promise<BuybackRequest>;
   listByUser(userId: string): Promise<BuybackRequest[]>;
   nextDailySequence(dateKey: string): Promise<number>;
+}
+
+export interface PartnerRepository {
+  create(partner: Partner): Promise<Partner>;
+  update(id: string, patch: Partial<Partner>): Promise<Partner>;
+  findById(id: string): Promise<Partner | undefined>;
+  findByUniqueIdentifier(uniqueIdentifier: string): Promise<Partner | undefined>;
+  list(filter?: { isActive?: boolean; partnerType?: PartnerType }): Promise<Partner[]>;
+}
+
+export interface PartnerLocationRepository {
+  create(location: PartnerLocation): Promise<PartnerLocation>;
+  update(id: string, patch: Partial<PartnerLocation>): Promise<PartnerLocation>;
+  findById(id: string): Promise<PartnerLocation | undefined>;
+  findByUniqueIdentifier(uniqueIdentifier: string): Promise<PartnerLocation | undefined>;
+  listByPartner(partnerId: string): Promise<PartnerLocation[]>;
+  list(filter?: { isActive?: boolean }): Promise<PartnerLocation[]>;
+}
+
+export interface RoleRepository {
+  create(role: Role): Promise<Role>;
+  update(id: string, patch: Partial<Role>): Promise<Role>;
+  findById(id: string): Promise<Role | undefined>;
+  list(filter?: { isActive?: boolean }): Promise<Role[]>;
+}
+
+export interface UserRoleRepository {
+  assign(userRole: UserRole): Promise<UserRole>;
+  /** Soft-revokes the assignment (isActive=false) rather than deleting the row, preserving the audit trail. */
+  revoke(userId: string, roleId: string): Promise<void>;
+  listByUser(userId: string): Promise<UserRole[]>;
+  findActive(userId: string, roleId: string): Promise<UserRole | undefined>;
+}
+
+export interface UserLocationHistoryRepository {
+  record(entry: UserLocationHistory): Promise<UserLocationHistory>;
+  listByUser(userId: string): Promise<UserLocationHistory[]>;
 }

@@ -7,7 +7,11 @@ import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { authRouter } from './routes/auth.routes';
 import { buybackRouter } from './routes/buyback.routes';
 import { catalogRouter } from './routes/catalog.routes';
+import { partnerLocationsRouter } from './routes/partnerLocations.routes';
+import { partnersRouter } from './routes/partners.routes';
+import { rolesRouter } from './routes/roles.routes';
 import { uploadsRouter } from './routes/uploads.routes';
+import { usersRouter } from './routes/users.routes';
 
 export function createApp() {
   const app = express();
@@ -30,6 +34,11 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/catalog', catalogRouter);
   app.use('/api/buyback', buybackRouter);
+  // Partner/vendor onboarding hierarchy: Partner -> Partner Location -> User -> Role.
+  app.use('/api/partners', partnersRouter);
+  app.use('/api/partner-locations', partnerLocationsRouter);
+  app.use('/api/roles', rolesRouter);
+  app.use('/api/users', usersRouter);
   // Uploaded ID documents / device photos - authenticated + ownership-checked,
   // never served as public static content. See routes/uploads.routes.ts.
   app.use('/api/uploads', uploadsRouter);

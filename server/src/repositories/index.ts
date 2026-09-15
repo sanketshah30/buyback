@@ -2,8 +2,23 @@ import { env } from '../config/env';
 import { InMemoryBuybackRepository } from './inMemory/buyback.repository';
 import { InMemoryCatalogRepository } from './inMemory/catalog.repository';
 import { InMemoryOtpRepository } from './inMemory/otp.repository';
+import { InMemoryPartnerRepository } from './inMemory/partner.repository';
+import { InMemoryPartnerLocationRepository } from './inMemory/partnerLocation.repository';
+import { InMemoryRoleRepository } from './inMemory/role.repository';
 import { InMemoryUserRepository } from './inMemory/user.repository';
-import { BuybackRepository, CatalogRepository, OtpRepository, UserRepository } from './interfaces';
+import { InMemoryUserLocationHistoryRepository } from './inMemory/userLocationHistory.repository';
+import { InMemoryUserRoleRepository } from './inMemory/userRole.repository';
+import {
+  BuybackRepository,
+  CatalogRepository,
+  OtpRepository,
+  PartnerLocationRepository,
+  PartnerRepository,
+  RoleRepository,
+  UserLocationHistoryRepository,
+  UserRepository,
+  UserRoleRepository,
+} from './interfaces';
 
 /**
  * Central place to select the active data driver.
@@ -28,3 +43,8 @@ export const userRepository: UserRepository = new InMemoryUserRepository();
 export const otpRepository: OtpRepository = new InMemoryOtpRepository();
 export const catalogRepository: CatalogRepository = new InMemoryCatalogRepository();
 export const buybackRepository: BuybackRepository = new InMemoryBuybackRepository();
+export const partnerRepository: PartnerRepository = new InMemoryPartnerRepository();
+export const partnerLocationRepository: PartnerLocationRepository = new InMemoryPartnerLocationRepository();
+export const roleRepository: RoleRepository = new InMemoryRoleRepository();
+export const userRoleRepository: UserRoleRepository = new InMemoryUserRoleRepository();
+export const userLocationHistoryRepository: UserLocationHistoryRepository = new InMemoryUserLocationHistoryRepository();

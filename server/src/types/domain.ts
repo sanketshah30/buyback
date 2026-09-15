@@ -164,11 +164,95 @@ export interface BuybackRequest {
   confirmedAt?: string;
 }
 
-export interface User {
-  id: string;
+/**
+ * Table: users
+ * The same User row represents both self-service buyback customers (who
+ * only ever have `mobile` + `name` set, from OTP login) and partner/vendor
+ * staff (promoters, partner admins, vendor admins, ...) who are additionally
+ * onboarded with `username`/`email` and assigned to a location. Both kinds
+ * authenticate through the same mobile+OTP flow - see auth.service.ts.
+ * FK: partnerLocationId -> partner_locations.id (a user's *current* location;
+ * changes are tracked in `UserLocationHistory` below).
+ */
+export interface User extends BaseEntity {
   mobile: string;
   name?: string;
-  createdAt: string;
+  username?: string;
+  email?: string;
+  partnerLocationId?: string;
+}
+
+export type PartnerType = 'vendor' | 'retailer';
+
+/**
+ * Table: partners
+ * The business entity on either side of a buyback: a "retailer" is a
+ * customer-facing purchase partner (e.g. a BestBuy storefront brand) and a
+ * "vendor" is who collected devices are sold on to (e.g. a refurbisher).
+ */
+export interface Partner extends BaseEntity {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  partnerType: PartnerType;
+  /** External/business identifier (e.g. merchant code, tax/registration ID) - unique among active partners. */
+  uniqueIdentifier: string;
+}
+
+/**
+ * Table: partner_locations
+ * An individual physical location of a partner (e.g. "BestBuy New York").
+ * FK: partnerId -> partners.id. Many locations can belong to one partner;
+ * each location belongs to exactly one partner.
+ */
+export interface PartnerLocation extends BaseEntity {
+  partnerId: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  /** External/business identifier for this location - unique among active locations. */
+  uniqueIdentifier: string;
+}
+
+/**
+ * Table: roles
+ * Master list of roles a user can hold (Partner Admin, Promoter, Vendor
+ * Admin, ...). `rights` is a structured list of permission-key strings
+ * (e.g. "manage_locations", "view_reports") rather than free text, so
+ * authorization checks can be built against it later.
+ */
+export interface Role extends BaseEntity {
+  name: string;
+  rights: string[];
+}
+
+/**
+ * Table: user_roles
+ * Many-to-many mapping - one user can hold multiple roles.
+ * FKs: userId -> users.id, roleId -> roles.id
+ */
+export interface UserRole extends BaseEntity {
+  userId: string;
+  roleId: string;
+}
+
+/**
+ * Table: user_location_history
+ * Every time a user's current location (users.partnerLocationId) changes,
+ * an entry is recorded here - append-only audit trail, never mutated.
+ * FKs: userId -> users.id, fromPartnerLocationId/toPartnerLocationId -> partner_locations.id
+ */
+export interface UserLocationHistory extends BaseEntity {
+  userId: string;
+  fromPartnerLocationId?: string;
+  toPartnerLocationId?: string;
+  changedByUserId?: string;
 }
 
 export interface OtpChallenge {
