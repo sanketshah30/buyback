@@ -2,10 +2,11 @@ import {
   Brand,
   BuybackRequest,
   Category,
-  Model,
   OtpChallenge,
+  Product,
   Question,
   Sku,
+  SkuAlias,
   User,
 } from '../types/domain';
 
@@ -29,16 +30,22 @@ export interface OtpRepository {
   create(challenge: OtpChallenge): Promise<OtpChallenge>;
   findById(requestId: string): Promise<OtpChallenge | undefined>;
   markVerified(requestId: string): Promise<void>;
+  recordFailedAttempt(requestId: string): Promise<OtpChallenge | undefined>;
 }
 
 export interface CatalogRepository {
   listCategories(): Promise<Category[]>;
-  listBrands(categoryId: string): Promise<Brand[]>;
-  listModels(categoryId: string, brandId: string): Promise<Model[]>;
-  listSkus(modelId: string): Promise<Sku[]>;
+  /** Brands are standalone (see types/domain.ts); this derives the distinct
+   * brands that have at least one active product listed under this category -
+   * the equivalent of `SELECT DISTINCT b.* FROM brands b JOIN products p ON
+   * p.brand_id = b.id WHERE p.category_id = ? AND p.is_active`. */
+  listBrandsByCategory(categoryId: string): Promise<Brand[]>;
+  listProducts(categoryId: string, brandId: string): Promise<Product[]>;
+  listSkus(productId: string): Promise<Sku[]>;
+  listSkuAliases(skuId: string): Promise<SkuAlias[]>;
   getCategory(categoryId: string): Promise<Category | undefined>;
   getBrand(brandId: string): Promise<Brand | undefined>;
-  getModel(modelId: string): Promise<Model | undefined>;
+  getProduct(productId: string): Promise<Product | undefined>;
   getSku(skuId: string): Promise<Sku | undefined>;
   listQuestions(categoryId: string): Promise<Question[]>;
 }

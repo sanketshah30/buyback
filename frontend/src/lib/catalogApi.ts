@@ -1,11 +1,15 @@
 import { api } from './api';
-import type { Brand, Category, Model, Question, Sku } from '../types/api';
+import type { Brand, Category, Product, Question, Sku, SkuAlias } from '../types/api';
 
+// All catalog lookups are POST + JSON body, never GET + query string, so
+// filter values never end up in URLs/server logs/browser history. These are
+// still pure reads (nothing is mutated) - see server/src/routes/catalog.routes.ts.
 export const catalogApi = {
-  listCategories: () => api.get<Category[]>('/api/catalog/categories'),
-  listBrands: (categoryId: string) => api.get<Brand[]>(`/api/catalog/brands?categoryId=${categoryId}`),
-  listModels: (categoryId: string, brandId: string) =>
-    api.get<Model[]>(`/api/catalog/models?categoryId=${categoryId}&brandId=${brandId}`),
-  listSkus: (modelId: string) => api.get<Sku[]>(`/api/catalog/skus?modelId=${modelId}`),
-  listQuestions: (categoryId: string) => api.get<Question[]>(`/api/catalog/questions?categoryId=${categoryId}`),
+  listCategories: () => api.post<Category[]>('/api/catalog/categories'),
+  listBrands: (categoryId: string) => api.post<Brand[]>('/api/catalog/brands', { categoryId }),
+  listProducts: (categoryId: string, brandId: string) =>
+    api.post<Product[]>('/api/catalog/products', { categoryId, brandId }),
+  listSkus: (productId: string) => api.post<Sku[]>('/api/catalog/skus', { productId }),
+  listSkuAliases: (skuId: string) => api.post<SkuAlias[]>('/api/catalog/sku-aliases', { skuId }),
+  listQuestions: (categoryId: string) => api.post<Question[]>('/api/catalog/questions', { categoryId }),
 };

@@ -14,8 +14,8 @@ export const buybackApi = {
     api.post<BuybackRequest>('/api/buyback', { categoryId, brandId }),
   setDevice: (id: string, value: string) =>
     api.patch<BuybackRequest>(`/api/buyback/${id}/device`, { value }),
-  setProduct: (id: string, modelId: string, skuId: string) =>
-    api.patch<BuybackRequest>(`/api/buyback/${id}/product`, { modelId, skuId }),
+  setProduct: (id: string, productId: string, skuId: string) =>
+    api.patch<BuybackRequest>(`/api/buyback/${id}/product`, { productId, skuId }),
   submitQuestionnaire: (id: string, answers: QuestionnaireAnswer[]) =>
     api.post<BuybackRequest>(`/api/buyback/${id}/assessment/questionnaire`, { answers }),
   submitImages: (id: string, files: File[]) => {

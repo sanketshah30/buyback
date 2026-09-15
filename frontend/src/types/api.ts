@@ -2,34 +2,43 @@
 // since frontend and server are independently deployable packages; consider
 // extracting a shared `packages/types` workspace once the API stabilizes.
 
+export interface BaseEntity {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
+}
+
 export type DeviceCategoryType = 'smartphone' | 'non-smartphone';
 
-export interface Category {
-  id: string;
+export interface Category extends BaseEntity {
   name: string;
   type: DeviceCategoryType;
 }
 
-export interface Brand {
-  id: string;
-  categoryId: string;
+/** Standalone - not scoped to a category. See server/src/types/domain.ts. */
+export interface Brand extends BaseEntity {
   name: string;
 }
 
-export interface Model {
-  id: string;
+export interface Product extends BaseEntity {
   categoryId: string;
   brandId: string;
   name: string;
   basePrice: number;
 }
 
-export interface Sku {
-  id: string;
-  modelId: string;
+export interface Sku extends BaseEntity {
+  productId: string;
   code: string;
   label: string;
   priceModifier: number;
+}
+
+export interface SkuAlias extends BaseEntity {
+  skuId: string;
+  partnerId: string;
+  partnerSkuName: string;
 }
 
 export type QuestionType = 'single-choice' | 'multi-choice';
@@ -104,7 +113,7 @@ export interface BuybackRequest {
   status: BuybackStatus;
   category?: Category;
   brand?: Brand;
-  model?: Model;
+  product?: Product;
   sku?: Sku;
   identifier?: { type: 'imei' | 'serial'; value: string };
   assessmentMethod?: AssessmentMethod;

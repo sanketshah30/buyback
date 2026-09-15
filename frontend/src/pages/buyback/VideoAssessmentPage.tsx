@@ -14,8 +14,8 @@ export function VideoAssessmentPage() {
   const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (!draft.model || !draft.sku) navigate('/buyback/new', { replace: true });
-  }, [draft.model, draft.sku, navigate]);
+    if (!draft.product || !draft.sku) navigate('/buyback/new', { replace: true });
+  }, [draft.product, draft.sku, navigate]);
 
   const handleSubmit = () => {
     if (!file) return;

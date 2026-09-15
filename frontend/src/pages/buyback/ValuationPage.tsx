@@ -31,7 +31,7 @@ export function ValuationPage() {
 
   useEffect(() => {
     if (!isFreshSubmission || submitStartedRef.current) return;
-    if (!draft.category || !draft.brand || !draft.identifier || !draft.model || !draft.sku || !draft.assessmentMethod) {
+    if (!draft.category || !draft.brand || !draft.identifier || !draft.product || !draft.sku || !draft.assessmentMethod) {
       navigate('/buyback/new', { replace: true });
       return;
     }

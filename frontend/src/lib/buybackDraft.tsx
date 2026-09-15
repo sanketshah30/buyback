@@ -5,7 +5,7 @@ import type {
   Brand,
   BuybackRequest,
   Category,
-  Model,
+  Product,
   QuestionnaireAnswer,
   Sku,
 } from '../types/api';
@@ -14,7 +14,7 @@ export interface BuybackDraftState {
   category?: Category;
   brand?: Brand;
   identifier?: { type: 'imei' | 'serial'; value: string };
-  model?: Model;
+  product?: Product;
   sku?: Sku;
   assessmentMethod?: AssessmentMethod;
   questionnaireAnswers?: QuestionnaireAnswer[];
@@ -26,7 +26,7 @@ interface BuybackDraftContextValue {
   draft: BuybackDraftState;
   setCategoryBrand: (category: Category, brand: Brand) => void;
   setIdentifier: (identifier: BuybackDraftState['identifier']) => void;
-  setProduct: (model: Model, sku: Sku) => void;
+  setProduct: (product: Product, sku: Sku) => void;
   setAssessmentMethod: (method: AssessmentMethod) => void;
   setQuestionnaireAnswers: (answers: QuestionnaireAnswer[]) => void;
   setAssessmentImages: (files: File[]) => void;
@@ -63,8 +63,8 @@ export function BuybackDraftProvider({ children }: { children: ReactNode }) {
     setDraft((prev) => ({ ...prev, identifier }));
   }, []);
 
-  const setProduct = useCallback((model: Model, sku: Sku) => {
-    setDraft((prev) => ({ ...prev, model, sku }));
+  const setProduct = useCallback((product: Product, sku: Sku) => {
+    setDraft((prev) => ({ ...prev, product, sku }));
   }, []);
 
   const setAssessmentMethod = useCallback((assessmentMethod: AssessmentMethod) => {
@@ -91,7 +91,7 @@ export function BuybackDraftProvider({ children }: { children: ReactNode }) {
   const submit = useCallback(async (): Promise<BuybackRequest> => {
     if (!draft.category || !draft.brand) throw new Error('Select a category and brand first');
     if (!draft.identifier) throw new Error('Enter the device IMEI/serial number first');
-    if (!draft.model || !draft.sku) throw new Error('Select the product model and SKU first');
+    if (!draft.product || !draft.sku) throw new Error('Select the product and SKU first');
     if (!draft.assessmentMethod) throw new Error('Choose a physical assessment method first');
 
     let request: BuybackRequest;
@@ -103,7 +103,7 @@ export function BuybackDraftProvider({ children }: { children: ReactNode }) {
     }
 
     request = await buybackApi.setDevice(request.id, draft.identifier.value);
-    request = await buybackApi.setProduct(request.id, draft.model.id, draft.sku.id);
+    request = await buybackApi.setProduct(request.id, draft.product.id, draft.sku.id);
 
     if (draft.assessmentMethod === 'questionnaire') {
       request = await buybackApi.submitQuestionnaire(request.id, draft.questionnaireAnswers ?? []);

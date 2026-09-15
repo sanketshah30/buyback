@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { NextFunction, Response, Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { catalogRepository, buybackRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
@@ -23,6 +23,20 @@ async function loadOwnedBuyback(id: string, userId: string): Promise<BuybackRequ
     throw Object.assign(new Error('Buyback request not found'), { status: 404 });
   }
   return request;
+}
+
+/**
+ * Verifies buyback ownership *before* the multer upload middleware runs, so a
+ * request for a buyback ID the caller doesn't own is rejected before any file
+ * is ever written to disk under that ID's upload folder.
+ */
+async function requireOwnedBuybackForUpload(req: AuthedRequest, _res: Response, next: NextFunction) {
+  try {
+    await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 buybackRouter.get('/', async (req: AuthedRequest, res, next) => {
@@ -100,15 +114,28 @@ buybackRouter.patch('/:id/device', async (req: AuthedRequest, res, next) => {
 buybackRouter.patch('/:id/product', async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-    const { modelId, skuId } = req.body as { modelId?: string; skuId?: string };
-    if (!modelId || !skuId) return res.status(400).json({ error: 'modelId and skuId are required' });
+    const { productId, skuId } = req.body as { productId?: string; skuId?: string };
+    if (!productId || !skuId) return res.status(400).json({ error: 'productId and skuId are required' });
+    if (!request.category || !request.brand) {
+      return res.status(400).json({ error: 'Select a category and brand first' });
+    }
 
-    const model = await catalogRepository.getModel(modelId);
+    const product = await catalogRepository.getProduct(productId);
     const sku = await catalogRepository.getSku(skuId);
-    if (!model || !sku) return res.status(404).json({ error: 'Unknown model or SKU' });
+    if (!product || !sku) return res.status(404).json({ error: 'Unknown product or SKU' });
+
+    // The product/SKU catalog is scoped by category+brand on the client, but the
+    // server must not trust that pairing - otherwise a low-value buyback could be
+    // patched with an unrelated high-value product to inflate its valuation.
+    if (product.categoryId !== request.category.id || product.brandId !== request.brand.id) {
+      return res.status(400).json({ error: "Selected product does not belong to this buyback's category/brand" });
+    }
+    if (sku.productId !== product.id) {
+      return res.status(400).json({ error: 'Selected SKU does not belong to the selected product' });
+    }
 
     const updated = await buybackRepository.update(request.id, {
-      model,
+      product,
       sku,
       status: 'product_selected',
     });
@@ -121,8 +148,29 @@ buybackRouter.patch('/:id/product', async (req: AuthedRequest, res, next) => {
 buybackRouter.post('/:id/assessment/questionnaire', async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    if (!request.category) return res.status(400).json({ error: 'Select a category first' });
     const { answers } = req.body as { answers?: QuestionnaireAnswer[] };
     if (!answers?.length) return res.status(400).json({ error: 'answers are required' });
+
+    // Trust nothing from the client about completeness - re-derive it from the
+    // category's actual configured questionnaire, otherwise a client could
+    // submit only the bonus "accessories" answer and skip every damage
+    // question to inflate the valuation.
+    const questions = await catalogRepository.listQuestions(request.category.id);
+    const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]));
+    for (const question of questions) {
+      const answer = answersByQuestion.get(question.id);
+      if (!answer || answer.optionIds.length === 0) {
+        return res.status(400).json({ error: `Missing answer for question "${question.id}"` });
+      }
+      const validOptionIds = new Set(question.options.map((o) => o.id));
+      if (!answer.optionIds.every((optionId) => validOptionIds.has(optionId))) {
+        return res.status(400).json({ error: `Invalid option selected for question "${question.id}"` });
+      }
+      if (question.type === 'single-choice' && answer.optionIds.length !== 1) {
+        return res.status(400).json({ error: `Question "${question.id}" accepts exactly one option` });
+      }
+    }
 
     const updated = await buybackRepository.update(request.id, {
       assessmentMethod: 'questionnaire',
@@ -137,6 +185,7 @@ buybackRouter.post('/:id/assessment/questionnaire', async (req: AuthedRequest, r
 
 buybackRouter.post(
   '/:id/assessment/images',
+  requireOwnedBuybackForUpload,
   upload.array('images', 6),
   async (req: AuthedRequest, res, next) => {
     try {
@@ -153,7 +202,7 @@ buybackRouter.post(
 
       const updated = await buybackRepository.update(request.id, {
         assessmentMethod: 'image',
-        assessmentImageUrls: files.map((f) => toPublicUrl(f.filename)),
+        assessmentImageUrls: files.map((f) => toPublicUrl(request.id, f.filename)),
         aiAssessment,
         questionnaireAnswers: aiAssessment.generatedAnswers,
         status: 'assessment_completed',
@@ -167,6 +216,7 @@ buybackRouter.post(
 
 buybackRouter.post(
   '/:id/assessment/video',
+  requireOwnedBuybackForUpload,
   upload.single('video'),
   async (req: AuthedRequest, res, next) => {
     try {
@@ -179,7 +229,7 @@ buybackRouter.post(
 
       const updated = await buybackRepository.update(request.id, {
         assessmentMethod: 'video',
-        assessmentVideoUrl: toPublicUrl(req.file.filename),
+        assessmentVideoUrl: toPublicUrl(request.id, req.file.filename),
         aiAssessment,
         questionnaireAnswers: aiAssessment.generatedAnswers,
         status: 'assessment_completed',
@@ -194,7 +244,7 @@ buybackRouter.post(
 buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-    if (!request.model || !request.sku || !request.category) {
+    if (!request.product || !request.sku || !request.category) {
       return res.status(400).json({ error: 'Product details must be selected before valuation' });
     }
     if (!request.questionnaireAnswers?.length) {
@@ -202,7 +252,7 @@ buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
     }
 
     const questions = await catalogRepository.listQuestions(request.category.id);
-    const basePrice = request.model.basePrice + request.sku.priceModifier;
+    const basePrice = request.product.basePrice + request.sku.priceModifier;
     const maxValue = computeMaxValue(basePrice, questions, request.questionnaireAnswers);
 
     const sequence = await buybackRepository.nextDailySequence(dateKey());
@@ -362,6 +412,7 @@ buybackRouter.post('/:id/customer/verify-otp', async (req: AuthedRequest, res, n
 
 buybackRouter.post(
   '/:id/documents',
+  requireOwnedBuybackForUpload,
   upload.single('document'),
   async (req: AuthedRequest, res, next) => {
     try {
@@ -370,7 +421,7 @@ buybackRouter.post(
 
       const requiresProductImages = request.assessmentMethod === 'questionnaire';
       const updated = await buybackRepository.update(request.id, {
-        documentProofUrl: toPublicUrl(req.file.filename),
+        documentProofUrl: toPublicUrl(request.id, req.file.filename),
         status: requiresProductImages ? 'document_uploaded' : 'product_images_uploaded',
       });
       return res.json(updated);
@@ -382,6 +433,7 @@ buybackRouter.post(
 
 buybackRouter.post(
   '/:id/product-images',
+  requireOwnedBuybackForUpload,
   upload.array('images', 6),
   async (req: AuthedRequest, res, next) => {
     try {
@@ -390,7 +442,7 @@ buybackRouter.post(
       if (files.length < 1) return res.status(400).json({ error: 'At least one product image is required' });
 
       const updated = await buybackRepository.update(request.id, {
-        productImageUrls: files.map((f) => toPublicUrl(f.filename)),
+        productImageUrls: files.map((f) => toPublicUrl(request.id, f.filename)),
         status: 'product_images_uploaded',
       });
       return res.json(updated);
@@ -408,6 +460,9 @@ buybackRouter.post('/:id/confirm', async (req: AuthedRequest, res, next) => {
     }
     if (!request.documentProofUrl) {
       return res.status(400).json({ error: 'Document proof must be uploaded before confirmation' });
+    }
+    if (request.assessmentMethod === 'questionnaire' && !request.productImageUrls?.length) {
+      return res.status(400).json({ error: '6-side product images are required for the questionnaire assessment path' });
     }
 
     const now = new Date().toISOString();

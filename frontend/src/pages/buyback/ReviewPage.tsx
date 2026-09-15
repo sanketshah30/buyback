@@ -64,9 +64,9 @@ export function ReviewPage() {
             <span className="summary-row__value">{data.category?.name}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-row__label">Brand / Model</span>
+            <span className="summary-row__label">Brand / Product</span>
             <span className="summary-row__value">
-              {data.brand?.name} {data.model?.name}
+              {data.brand?.name} {data.product?.name}
             </span>
           </div>
           <div className="summary-row">

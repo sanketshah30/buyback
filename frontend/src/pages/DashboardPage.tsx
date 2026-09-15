@@ -95,7 +95,7 @@ export function DashboardPage() {
               >
                 <div className="dashboard-list__row">
                   <div>
-                    <strong>{request.model?.name ?? request.category?.name ?? 'Buyback request'}</strong>
+                    <strong>{request.product?.name ?? request.category?.name ?? 'Buyback request'}</strong>
                     <p>{STATUS_LABELS[request.status] ?? request.status}</p>
                   </div>
                   {request.maxValue !== undefined && <span className="dashboard-list__value">₹{request.maxValue}</span>}
@@ -119,7 +119,7 @@ export function DashboardPage() {
                     <div>
                       <strong>{request.displayId}</strong>
                       <p>
-                        {request.model?.name} · {request.sku?.label}
+                        {request.product?.name} · {request.sku?.label}
                       </p>
                     </div>
                     <span className="dashboard-list__value">₹{request.finalValue}</span>

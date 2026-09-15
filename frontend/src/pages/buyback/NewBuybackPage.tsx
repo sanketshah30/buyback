@@ -10,7 +10,7 @@ import { TextField } from '../../components/ui/TextField';
 import { ScanIcon } from '../../components/ui/icons';
 import { useBuybackDraft } from '../../lib/buybackDraft';
 import { catalogApi } from '../../lib/catalogApi';
-import type { Brand, Category, Model, Sku } from '../../types/api';
+import type { Brand, Category, Product, Sku } from '../../types/api';
 
 type SectionKey = 'category' | 'device' | 'product';
 
@@ -43,9 +43,9 @@ export function NewBuybackPage() {
   const [deviceValue, setDeviceValue] = useState(draft.identifier?.value ?? '');
 
   // Section 3: product details
-  const [models, setModels] = useState<Model[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [skus, setSkus] = useState<Sku[]>([]);
-  const [modelId, setModelId] = useState(draft.model?.id ?? '');
+  const [productId, setProductId] = useState(draft.product?.id ?? '');
   const [skuId, setSkuId] = useState(draft.sku?.id ?? '');
 
   useEffect(() => {
@@ -62,23 +62,23 @@ export function NewBuybackPage() {
 
   useEffect(() => {
     if (!categoryId || !brandId) {
-      setModels([]);
+      setProducts([]);
       return;
     }
-    catalogApi.listModels(categoryId, brandId).then(setModels);
+    catalogApi.listProducts(categoryId, brandId).then(setProducts);
   }, [categoryId, brandId]);
 
   useEffect(() => {
-    if (!modelId) {
+    if (!productId) {
       setSkus([]);
       return;
     }
-    catalogApi.listSkus(modelId).then(setSkus);
-  }, [modelId]);
+    catalogApi.listSkus(productId).then(setSkus);
+  }, [productId]);
 
   const selectedCategory = categories.find((c) => c.id === categoryId) ?? draft.category;
   const selectedBrand = brands.find((b) => b.id === brandId) ?? draft.brand;
-  const selectedModel = models.find((m) => m.id === modelId);
+  const selectedProduct = products.find((p) => p.id === productId);
   const selectedSku = skus.find((s) => s.id === skuId);
   const isSmartphone = selectedCategory?.type === 'smartphone';
   const deviceValid = isSmartphone ? /^\d{16}$/.test(deviceValue) : /^[a-zA-Z0-9]{12,16}$/.test(deviceValue);
@@ -116,7 +116,7 @@ export function NewBuybackPage() {
     setCategoryId('');
     setBrandId('');
     setDeviceValue('');
-    setModelId('');
+    setProductId('');
     setSkuId('');
     setActiveSection('category');
   };
@@ -124,14 +124,14 @@ export function NewBuybackPage() {
   const handleEditDevice = () => {
     if (activeSection === 'device') return;
     setDeviceValue('');
-    setModelId('');
+    setProductId('');
     setSkuId('');
     setActiveSection('device');
   };
 
   const handleContinueProduct = () => {
-    if (!selectedModel || !selectedSku) return;
-    setProduct(selectedModel, selectedSku);
+    if (!selectedProduct || !selectedSku) return;
+    setProduct(selectedProduct, selectedSku);
     navigate('/buyback/new/assessment');
   };
 
@@ -141,7 +141,7 @@ export function NewBuybackPage() {
       subtitle="Complete each step to get your device assessed"
       footer={
         activeSection === 'product' ? (
-          <Button onClick={handleContinueProduct} disabled={!modelId || !skuId}>
+          <Button onClick={handleContinueProduct} disabled={!productId || !skuId}>
             Continue to assessment
           </Button>
         ) : undefined
@@ -217,7 +217,7 @@ export function NewBuybackPage() {
           index={3}
           title="Product information"
           status={productStatus}
-          summary={selectedModel && selectedSku ? `${selectedModel.name} · ${selectedSku.label}` : undefined}
+          summary={selectedProduct && selectedSku ? `${selectedProduct.name} · ${selectedSku.label}` : undefined}
         >
           <label className="text-field">
             <span className="text-field__label">Brand</span>
@@ -227,22 +227,22 @@ export function NewBuybackPage() {
           </label>
 
           <Select
-            label="Model"
-            placeholder="Select model"
-            value={modelId}
+            label="Product"
+            placeholder="Select product"
+            value={productId}
             onChange={(value) => {
-              setModelId(value);
+              setProductId(value);
               setSkuId('');
             }}
-            options={models.map((m) => ({ value: m.id, label: m.name }))}
+            options={products.map((p) => ({ value: p.id, label: p.name }))}
           />
 
           <Select
             label="SKU / Variant"
-            placeholder={modelId ? 'Select SKU' : 'Select a model first'}
+            placeholder={productId ? 'Select SKU' : 'Select a product first'}
             value={skuId}
             onChange={setSkuId}
-            disabled={!modelId}
+            disabled={!productId}
             options={skus.map((s) => ({ value: s.id, label: s.label }))}
           />
         </AccordionSection>

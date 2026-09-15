@@ -1,31 +1,67 @@
+/**
+ * Every persisted catalog entity carries the standard audit columns
+ * (`id`, `createdAt`, `updatedAt`, `isActive`) so this maps cleanly onto real
+ * SQL tables later - `isActive` doubles as a soft-delete flag instead of
+ * hard-deleting rows that historical buybacks may still reference.
+ */
+export interface BaseEntity {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
+}
+
 export type DeviceCategoryType = 'smartphone' | 'non-smartphone';
 
-export interface Category {
-  id: string;
+/** Table: product_categories */
+export interface Category extends BaseEntity {
   name: string;
   type: DeviceCategoryType;
 }
 
-export interface Brand {
-  id: string;
-  categoryId: string;
+/**
+ * Table: brands
+ * Standalone - a brand (e.g. "Apple") is not scoped to a single category.
+ * The category relationship lives on `Product` instead, so the same brand
+ * row is reused across every category it sells in.
+ */
+export interface Brand extends BaseEntity {
   name: string;
 }
 
-export interface Model {
-  id: string;
+/**
+ * Table: products
+ * FKs: categoryId -> product_categories.id, brandId -> brands.id
+ */
+export interface Product extends BaseEntity {
   categoryId: string;
   brandId: string;
   name: string;
   basePrice: number;
 }
 
-export interface Sku {
-  id: string;
-  modelId: string;
+/**
+ * Table: skus
+ * FK: productId -> products.id
+ */
+export interface Sku extends BaseEntity {
+  productId: string;
   code: string;
   label: string;
   priceModifier: number;
+}
+
+/**
+ * Table: sku_aliases
+ * Maps a reselling/trade-in partner's own SKU naming onto our canonical SKU,
+ * so inbound partner feeds can be resolved without the partner needing to
+ * know our internal SKU IDs.
+ * FK: skuId -> skus.id
+ */
+export interface SkuAlias extends BaseEntity {
+  skuId: string;
+  partnerId: string;
+  partnerSkuName: string;
 }
 
 export type QuestionType = 'single-choice' | 'multi-choice';
@@ -101,7 +137,7 @@ export interface BuybackRequest {
   status: BuybackStatus;
   category?: Category;
   brand?: Brand;
-  model?: Model;
+  product?: Product;
   sku?: Sku;
   identifier?: {
     type: 'imei' | 'serial';
@@ -143,4 +179,6 @@ export interface OtpChallenge {
   buybackId?: string;
   expiresAt: string;
   verified: boolean;
+  /** Failed verify attempts against this challenge - locked out after too many. */
+  attempts: number;
 }
