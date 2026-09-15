@@ -15,6 +15,7 @@ import {
   QuestionTranslation,
   QuestionnaireConfig,
   Role,
+  Session,
   Sku,
   SkuAlias,
   User,
@@ -49,6 +50,13 @@ export interface OtpRepository {
   findById(requestId: string): Promise<OtpChallenge | undefined>;
   markVerified(requestId: string): Promise<void>;
   recordFailedAttempt(requestId: string): Promise<OtpChallenge | undefined>;
+}
+
+export interface SessionRepository {
+  create(session: Session): Promise<Session>;
+  findByToken(token: string): Promise<Session | undefined>;
+  revoke(token: string): Promise<void>;
+  listByUser(userId: number): Promise<Session[]>;
 }
 
 export interface CatalogRepository {

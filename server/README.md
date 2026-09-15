@@ -18,13 +18,15 @@ src/
   config/env.ts          Centralized environment configuration
   types/domain.ts         Shared domain types (BuybackRequest, Category, Question, ...)
   data/catalog.seed.ts    Mock catalog + configurable questionnaire data
+  data/user.seed.ts       Predefined, whitelisted staff/promoter accounts + role assignments
   repositories/           Data-access interfaces + in-memory implementation
     interfaces.ts          <- contracts a future MySQL implementation must satisfy
     inMemory/               <- current mock implementation (Maps in process memory)
       db.ts                  <- the "database": primary Maps + secondary indexes (see below)
       indexUtils.ts           <- tiny helper for maintaining a secondary index
-  services/               Business logic (auth/OTP, valuation, AI-mock assessment, diagnosis, notifications)
-  middleware/              Auth guard, file upload (multer), error handling
+      session.repository.ts   <- login sessions (separate from otp_challenges - see README below)
+  services/               Business logic (auth/OTP/sessions, valuation, AI-mock assessment, diagnosis, notifications)
+  middleware/              Auth guard, role/rights guard, file upload (multer), error handling
   routes/                  Express routers: auth, catalog, buyback, partners, users, questions, ...
   utils/idGenerator.ts     Auto-increment integer ID generator (every table's PK)
   utils/parseId.ts         Validates/coerces a route param or body value into a positive integer PK
@@ -206,6 +208,55 @@ ties are never blended:
 If no tier has any config rows for that category at all (e.g. an unconfigured category),
 the response is an empty question list - there's no fallback below tier 4.
 
+## Authentication, sessions & role-based access
+
+Login is **whitelist-only staff/promoter login**, not open customer self-signup - this app
+is used by store staff to *process* buybacks on a walk-in customer's behalf (the
+customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest.customer`
+- a plain field, not a `User` row).
+
+- **`users` is a predefined table now** (`src/data/user.seed.ts`), not something OTP login
+  populates on the fly. `POST /api/auth/otp/request` (purpose `login`) checks the mobile
+  against an existing, active `User` **with at least one active role** and rejects it with
+  `403` otherwise ("This mobile number is not registered..." / "...has no role assigned...").
+  This check only applies to staff login - the *customer* confirmation OTP
+  (`POST /api/buyback/:id/customer`) still works for any mobile number, since it never
+  touches the `users` table.
+- **OTP verification and the resulting login session are two separate tables**:
+  `otp_challenges` (the short-lived, one-time code exchange, keyed by an opaque
+  `requestId` - see the `OtpChallenge` doc comment in `types/domain.ts` for why it isn't a
+  sequential integer PK) and `sessions` (one row per completed login, storing the issued
+  JWT, `expiresAt`, and an optional `revokedAt` - FK `userId` -> `users.id`, indexed on
+  `userId` and on the token itself). `requireAuth` checks **both** the JWT's own
+  signature/expiry *and* that its `sessions` row hasn't been revoked/expired - this is what
+  makes `POST /api/auth/logout` actually invalidate a token instead of it staying valid
+  until it naturally expires.
+- **Login resolves and returns `partnerId`/`partnerLocationId`/`roles` up front**, derived
+  server-side from the authenticated user's record (`user.partnerLocationId` ->
+  `partner_locations.partnerId`) rather than the client supplying them: `POST
+  /api/auth/otp/verify` responds with `{ token, user, partnerId, partnerLocationId, roles }`.
+  The frontend stores all of this in `localStorage` (`useAuth()` in `frontend/src/lib/auth.tsx`)
+  for the rest of the session, so any screen can read "which partner/location am I acting
+  for" without a re-fetch, and it feeds the (future) questionnaire-config `resolve()` call's
+  `partnerId` - `productCategoryId`/`brandId` come from what the user picks on the first
+  screen, `partnerId` comes from who's logged in.
+- **Buyback processing is gated by role**: every `/api/buyback/*` route requires the
+  `process_buyback` right (`requireRight('process_buyback')` in `middleware/rights.middleware.ts`,
+  mounted on the whole `buybackRouter`) - only roles that grant it (Promoter, by default -
+  see `roles` in `data/partner.seed.ts`) can start/process a buyback, even though any
+  whitelisted, role-having user can still log in.
+- **Predefined demo accounts** (`src/data/user.seed.ts`), all use OTP `123456`:
+
+  | Mobile | Role | Can process buybacks? |
+  | --- | --- | --- |
+  | `9820852131` | Promoter | Yes (`process_buyback`) |
+  | `9000000002` | Partner Admin | No |
+  | `9000000003` | Super Admin | No |
+
+  (Partner Admin/Super Admin don't carry `process_buyback` in the seed data - they're there
+  to demonstrate the role gate rejecting a logged-in user who lacks the right, and are the
+  natural place to hang future admin-only screens like partner/location/user management.)
+
 ## Mock behaviors to know about
 
 - **OTP**: always `123456` (configurable via `MOCK_OTP_CODE`) and echoed back in API responses as `devOtp` for easy testing (no real SMS/email gateway is wired up). SMS/email "sends" are logged to the server console. Verification is rate-limited to 5 incorrect attempts per OTP request before it's locked out.
@@ -218,8 +269,9 @@ the response is an empty question list - there's no fallback below tier 4.
 
 | Method & Path | Purpose |
 | --- | --- |
-| `POST /api/auth/otp/request` | Request login OTP for a mobile number |
-| `POST /api/auth/otp/verify` | Verify OTP, returns JWT + user |
+| `POST /api/auth/otp/request` | Request login OTP for a mobile number (whitelist-only - `403` if the mobile isn't a registered, role-having `User`) |
+| `POST /api/auth/otp/verify` | Verify OTP, creates a `sessions` row, returns `{ token, user, partnerId, partnerLocationId, roles }` |
+| `POST /api/auth/logout` | Revoke the caller's session - the JWT stops working immediately, before its natural expiry |
 | `POST /api/catalog/categories` | List product categories |
 | `POST /api/catalog/brands` | List brands for a category (body: `{ categoryId }`) |
 | `POST /api/catalog/products` | List products for a category+brand (body: `{ categoryId, brandId }`) |
@@ -287,7 +339,7 @@ the response is an empty question list - there's no fallback below tier 4.
 | `POST /api/questionnaire-config/search` | List/filter config rows |
 | `POST /api/questionnaire-config/resolve` | **Main endpoint**: body `{ productCategoryId, brandId?, partnerId?, language? }` → the resolved, sequenced questionnaire |
 
-All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, and `/api/questionnaire-config/*` routes require `Authorization: Bearer <token>` from the OTP login flow.
+All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, and `/api/questionnaire-config/*` routes require `Authorization: Bearer <token>` from the OTP login flow. `/api/buyback/*` additionally requires the caller's role to grant the `process_buyback` right (see "Authentication, sessions & role-based access" above).
 
 ### When does a buyback record actually get created?
 

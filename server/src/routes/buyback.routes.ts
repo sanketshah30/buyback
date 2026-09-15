@@ -1,6 +1,7 @@
 import { NextFunction, Response, Router } from 'express';
 import { catalogRepository, buybackRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import { toPublicUrl, upload } from '../middleware/upload.middleware';
 import { assessmentService } from '../services/assessment.service';
 import { authService } from '../services/auth.service';
@@ -14,6 +15,11 @@ import { parseId } from '../utils/parseId';
 
 export const buybackRouter = Router();
 buybackRouter.use(requireAuth);
+// Processing a buyback (starting one, capturing device info, assessing,
+// confirming, ...) is gated behind the "process_buyback" right - only roles
+// like Promoter carry it (see data/partner.seed.ts). Plain viewing (GET /)
+// of one's own buyback history is intentionally not gated further here.
+buybackRouter.use(requireRight('process_buyback'));
 
 const IMEI_REGEX = /^[0-9]{16}$/;
 const SERIAL_REGEX = /^[a-zA-Z0-9]{12,16}$/;

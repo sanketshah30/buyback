@@ -11,6 +11,7 @@ import { InMemoryQuestionAnswerMappingRepository } from './inMemory/questionAnsw
 import { InMemoryQuestionTranslationRepository } from './inMemory/questionTranslation.repository';
 import { InMemoryQuestionnaireConfigRepository } from './inMemory/questionnaireConfig.repository';
 import { InMemoryRoleRepository } from './inMemory/role.repository';
+import { InMemorySessionRepository } from './inMemory/session.repository';
 import { InMemoryUserRepository } from './inMemory/user.repository';
 import { InMemoryUserLocationHistoryRepository } from './inMemory/userLocationHistory.repository';
 import { InMemoryUserRoleRepository } from './inMemory/userRole.repository';
@@ -27,6 +28,7 @@ import {
   QuestionTranslationRepository,
   QuestionnaireConfigRepository,
   RoleRepository,
+  SessionRepository,
   UserLocationHistoryRepository,
   UserRepository,
   UserRoleRepository,
@@ -53,6 +55,7 @@ assertSupportedDriver();
 
 export const userRepository: UserRepository = new InMemoryUserRepository();
 export const otpRepository: OtpRepository = new InMemoryOtpRepository();
+export const sessionRepository: SessionRepository = new InMemorySessionRepository();
 export const catalogRepository: CatalogRepository = new InMemoryCatalogRepository();
 export const buybackRepository: BuybackRepository = new InMemoryBuybackRepository();
 export const partnerRepository: PartnerRepository = new InMemoryPartnerRepository();

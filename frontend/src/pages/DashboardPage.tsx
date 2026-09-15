@@ -67,7 +67,7 @@ export function DashboardPage() {
           <p>Welcome back</p>
           <h1>{user?.mobile ?? 'Buyback customer'}</h1>
         </div>
-        <button className="dashboard-header__logout" onClick={logout} type="button">
+        <button className="dashboard-header__logout" onClick={() => void logout()} type="button">
           Log out
         </button>
       </div>

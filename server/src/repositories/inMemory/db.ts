@@ -8,6 +8,7 @@ import {
   questionTranslations,
   questionnaireConfigs,
 } from '../../data/questionnaireConfig.seed';
+import { users, userRoles as seededUserRoles } from '../../data/user.seed';
 import {
   AnswerTranslation,
   BuybackRequest,
@@ -21,6 +22,7 @@ import {
   QuestionTranslation,
   QuestionnaireConfig,
   Role,
+  Session,
   Sku,
   SkuAlias,
   User,
@@ -46,8 +48,11 @@ import { addToIndex, Index } from './indexUtils';
  * modules.
  */
 export const tables = {
-  users: new Map<number, User>(),
+  // Whitelisted, predefined staff/promoter accounts - see data/user.seed.ts.
+  // Unlike the old MVP behavior, logging in never auto-creates a row here.
+  users: new Map<number, User>(users.map((u) => [u.id, u])),
   otpChallenges: new Map<string, OtpChallenge>(), // keyed by the opaque requestId, not an integer PK - see OtpChallenge doc comment
+  sessions: new Map<number, Session>(), // one row per completed login - see Session doc comment
   buybackRequests: new Map<number, BuybackRequest>(),
   dailySequences: new Map<string, number>(), // dateKey -> last count (business display-ID counter, not a table)
 
@@ -58,7 +63,7 @@ export const tables = {
   partners: new Map<number, Partner>(partners.map((p) => [p.id, p])),
   partnerLocations: new Map<number, PartnerLocation>(partnerLocations.map((l) => [l.id, l])),
   roles: new Map<number, Role>(roles.map((r) => [r.id, r])),
-  userRoles: new Map<number, UserRole>(),
+  userRoles: new Map<number, UserRole>(seededUserRoles.map((ur) => [ur.id, ur])),
   userLocationHistory: new Map<number, UserLocationHistory>(),
 
   masterQuestions: new Map<number, MasterQuestion>(masterQuestions.map((q) => [q.id, q])),
@@ -74,6 +79,8 @@ export const indexes = {
   usersByMobile: new Map<string, number>(), // unique index
   usersByPartnerLocationId: new Map<number, Set<number>>() as Index<number>,
   buybackRequestsByUserId: new Map<number, Set<number>>() as Index<number>,
+  sessionsByToken: new Map<string, number>(), // unique index
+  sessionsByUserId: new Map<number, Set<number>>() as Index<number>,
 
   partnerLocationsByPartnerId: new Map<number, Set<number>>() as Index<number>,
   userRolesByUserId: new Map<number, Set<number>>() as Index<number>,
@@ -98,6 +105,15 @@ export function profileKey(categoryId: number, brandId: number | null, partnerId
 
 // Populate indexes for seeded rows (rows created later via the API maintain
 // these incrementally in their respective repository's create/update methods).
+for (const user of users) {
+  indexes.usersByMobile.set(user.mobile, user.id);
+  if (user.partnerLocationId !== undefined) {
+    addToIndex(indexes.usersByPartnerLocationId, user.partnerLocationId, user.id);
+  }
+}
+for (const userRole of seededUserRoles) {
+  addToIndex(indexes.userRolesByUserId, userRole.userId, userRole.id);
+}
 for (const location of partnerLocations) {
   addToIndex(indexes.partnerLocationsByPartnerId, location.partnerId, location.id);
 }

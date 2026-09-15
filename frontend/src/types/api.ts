@@ -140,3 +140,9 @@ export interface User {
   name?: string;
   createdAt: string;
 }
+
+export interface Role {
+  id: number;
+  name: string;
+  rights: string[];
+}

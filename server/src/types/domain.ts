@@ -359,6 +359,23 @@ export interface QuestionnaireConfig extends BaseEntity {
   sequence: number;
 }
 
+/**
+ * Table: sessions
+ * A row is created every time a user completes `login`-purpose OTP
+ * verification, capturing that login/session event separately from the
+ * short-lived `OtpChallenge` used to get there. The issued JWT is stored
+ * here (indexed, see db.ts) so `requireAuth` can reject an otherwise
+ * validly-signed token whose session has been revoked (logout) or expired -
+ * something a bare stateless JWT can't support on its own.
+ * FK: userId -> users.id (indexed).
+ */
+export interface Session extends BaseEntity {
+  userId: number;
+  token: string;
+  expiresAt: string;
+  revokedAt?: string;
+}
+
 export interface OtpChallenge {
   /**
    * Opaque, unguessable request handle handed to the client - deliberately

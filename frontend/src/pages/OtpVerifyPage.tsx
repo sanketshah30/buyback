@@ -36,7 +36,11 @@ export function OtpVerifyPage() {
     setLoading(true);
     try {
       const response = await authApi.verifyOtp(state.requestId, otp);
-      login(response.token, response.user);
+      login(response.token, response.user, {
+        partnerId: response.partnerId,
+        partnerLocationId: response.partnerLocationId,
+        roles: response.roles,
+      });
       navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');

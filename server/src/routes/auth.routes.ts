@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { authService } from '../services/auth.service';
 
 export const authRouter = Router();
@@ -26,6 +27,17 @@ authRouter.post('/otp/verify', async (req, res, next) => {
     }
     const result = await authService.verifyOtp(requestId, otp);
     return res.json(result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Revokes the caller's session so this JWT is rejected by requireAuth from
+// this point on, even though the JWT itself would otherwise still verify.
+authRouter.post('/logout', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    await authService.logout(req.auth!.token);
+    return res.status(204).send();
   } catch (err) {
     return next(err);
   }
