@@ -19,4 +19,13 @@ export class InMemoryOtpRepository implements OtpRepository {
       tables.otpChallenges.set(requestId, challenge);
     }
   }
+
+  async recordFailedAttempt(requestId: string): Promise<OtpChallenge | undefined> {
+    const challenge = tables.otpChallenges.get(requestId);
+    if (challenge) {
+      challenge.attempts += 1;
+      tables.otpChallenges.set(requestId, challenge);
+    }
+    return challenge;
+  }
 }

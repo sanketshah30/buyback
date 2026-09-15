@@ -1,5 +1,7 @@
 import { createApp } from './app';
-import { env } from './config/env';
+import { assertProductionSafety, env } from './config/env';
+
+assertProductionSafety();
 
 const app = createApp();
 
