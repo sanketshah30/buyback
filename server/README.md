@@ -105,6 +105,55 @@ allowing a mutation (e.g. anyone authenticated can call `POST /api/partners`) - 
 only establishes the schema for that; wiring up actual authorization checks against
 `rights` is a follow-up.
 
+## Questionnaire configuration module
+
+A config-driven engine for deciding which physical-assessment questions to show, based on
+the product category + brand + partner the app is currently working with. **This is
+additive/config-only for now** - it is not yet wired into the live buyback flow, which
+still uses the hardcoded `questionsByCategory` in `src/data/catalog.seed.ts`; that
+integration (and answer-to-valuation scoring) is a follow-up phase.
+
+```
+questions ──1:N──▶ question_translations
+   │
+   │ N:M (via question_answer_mapping)
+   ▼
+answers ──1:N──▶ answer_translations
+
+questionnaire_config: (product_category, brand?, partner?) ──▶ question_answer_mapping, sequence
+```
+
+| Table | Description | Foreign keys |
+| --- | --- | --- |
+| `questions` | Language-agnostic question "concept" (just a `type`: single/multi-choice) | - |
+| `question_translations` | Display text per language | `questionId` → questions.id |
+| `answers` | Language-agnostic answer "concept" (`code` is a stable key like `"yes"`, for programmatic reference) | - |
+| `answer_translations` | Display text per language | `answerId` → answers.id |
+| `question_answer_mapping` | "This Answer is a valid option for this Question" | `questionId` → questions.id, `answerId` → answers.id |
+| `questionnaire_config` | Which question-answer options apply for a (category, brand, partner) combo, and their display order | `productCategoryId` → product_categories.id (required), `brandId`/`partnerId` → brands.id/partners.id (nullable = wildcard) |
+
+**Why Language isn't a column on `questions`/`answers` directly:** baking it in would mean
+every translation needs its own separate row with its own ID, which then forces
+`question_answer_mapping` and `questionnaire_config` to be duplicated per language too.
+Splitting language out into `*_translations` child tables means one mapping/config works
+across every language - display text is just resolved at read time (falling back to
+English if a translation is missing).
+
+**Resolution rule** (`POST /api/questionnaire-config/resolve`): Product Category is always
+required and matched exactly (never a wildcard). Brand/Partner are optional - `null` in
+the database means "applies to all" (adapted from the spec's `0` sentinel, since these
+reference the catalog/partner-onboarding modules' real string IDs rather than integers).
+Given an input category (+ optional brand/partner), the **single most specific matching
+tier wins** - ties are never blended:
+
+1. Category exact + Brand exact + Partner exact
+2. Category exact + Brand **wildcard** + Partner exact (partner-specificity beats brand-specificity)
+3. Category exact + Brand exact + Partner **wildcard**
+4. Category exact + Brand wildcard + Partner wildcard (generic fallback)
+
+If no tier has any config rows for that category at all (e.g. an unconfigured category),
+the response is an empty question list - there's no fallback below tier 4.
+
 ## Mock behaviors to know about
 
 - **OTP**: always `123456` (configurable via `MOCK_OTP_CODE`) and echoed back in API responses as `devOtp` for easy testing (no real SMS/email gateway is wired up). SMS/email "sends" are logged to the server console. Verification is rate-limited to 5 incorrect attempts per OTP request before it's locked out.
@@ -164,8 +213,29 @@ only establishes the schema for that; wiring up actual authorization checks agai
 | `GET /api/users/:id/roles` | List a user's currently-assigned roles |
 | `POST /api/users/:id/roles` | Assign a role to a user |
 | `DELETE /api/users/:id/roles/:roleId` | Revoke a role from a user |
+| `POST /api/questions` | Create a question (optionally with initial translations) |
+| `PATCH /api/questions/:id` | Update a question |
+| `GET /api/questions/:id` | Fetch a question |
+| `POST /api/questions/search` | List/filter questions (body: `{ isActive? }`) |
+| `GET /api/questions/:id/translations` | List a question's translations |
+| `POST /api/questions/:id/translations` | Add/update a translation (upsert by language) |
+| `POST /api/answers` | Create an answer (optionally with initial translations) |
+| `PATCH /api/answers/:id` | Update an answer |
+| `GET /api/answers/:id` | Fetch an answer |
+| `POST /api/answers/search` | List/filter answers (body: `{ isActive? }`) |
+| `GET /api/answers/:id/translations` | List an answer's translations |
+| `POST /api/answers/:id/translations` | Add/update a translation (upsert by language) |
+| `POST /api/question-answers` | Map an answer as a valid option for a question |
+| `PATCH /api/question-answers/:id` | Update a mapping (e.g. deactivate) |
+| `GET /api/question-answers/:id` | Fetch a mapping |
+| `POST /api/question-answers/search` | List mappings (body: `{ questionId?, isActive? }`) |
+| `POST /api/questionnaire-config` | Create a (category, brand?, partner?) → question-answer + sequence config row |
+| `PATCH /api/questionnaire-config/:id` | Update a config row |
+| `GET /api/questionnaire-config/:id` | Fetch a config row |
+| `POST /api/questionnaire-config/search` | List/filter config rows |
+| `POST /api/questionnaire-config/resolve` | **Main endpoint**: body `{ productCategoryId, brandId?, partnerId?, language? }` → the resolved, sequenced questionnaire |
 
-All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, and `/api/users/*` routes require `Authorization: Bearer <token>` from the OTP login flow.
+All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, and `/api/questionnaire-config/*` routes require `Authorization: Bearer <token>` from the OTP login flow.
 
 ### When does a buyback record actually get created?
 

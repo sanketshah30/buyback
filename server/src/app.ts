@@ -7,8 +7,12 @@ import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { authRouter } from './routes/auth.routes';
 import { buybackRouter } from './routes/buyback.routes';
 import { catalogRouter } from './routes/catalog.routes';
+import { answersRouter } from './routes/answers.routes';
 import { partnerLocationsRouter } from './routes/partnerLocations.routes';
 import { partnersRouter } from './routes/partners.routes';
+import { questionAnswersRouter } from './routes/questionAnswers.routes';
+import { questionnaireConfigRouter } from './routes/questionnaireConfig.routes';
+import { questionsRouter } from './routes/questions.routes';
 import { rolesRouter } from './routes/roles.routes';
 import { uploadsRouter } from './routes/uploads.routes';
 import { usersRouter } from './routes/users.routes';
@@ -39,6 +43,12 @@ export function createApp() {
   app.use('/api/partner-locations', partnerLocationsRouter);
   app.use('/api/roles', rolesRouter);
   app.use('/api/users', usersRouter);
+  // Questionnaire configuration module: master Questions/Answers, their
+  // mapping, and the category/brand/partner resolution rules.
+  app.use('/api/questions', questionsRouter);
+  app.use('/api/answers', answersRouter);
+  app.use('/api/question-answers', questionAnswersRouter);
+  app.use('/api/questionnaire-config', questionnaireConfigRouter);
   // Uploaded ID documents / device photos - authenticated + ownership-checked,
   // never served as public static content. See routes/uploads.routes.ts.
   app.use('/api/uploads', uploadsRouter);

@@ -1,13 +1,19 @@
 import {
+  AnswerTranslation,
   Brand,
   BuybackRequest,
   Category,
+  MasterAnswer,
+  MasterQuestion,
   OtpChallenge,
   Partner,
   PartnerLocation,
   PartnerType,
   Product,
   Question,
+  QuestionAnswerMapping,
+  QuestionTranslation,
+  QuestionnaireConfig,
   Role,
   Sku,
   SkuAlias,
@@ -105,4 +111,63 @@ export interface UserRoleRepository {
 export interface UserLocationHistoryRepository {
   record(entry: UserLocationHistory): Promise<UserLocationHistory>;
   listByUser(userId: string): Promise<UserLocationHistory[]>;
+}
+
+export interface MasterQuestionRepository {
+  create(question: MasterQuestion): Promise<MasterQuestion>;
+  update(id: string, patch: Partial<MasterQuestion>): Promise<MasterQuestion>;
+  findById(id: string): Promise<MasterQuestion | undefined>;
+  list(filter?: { isActive?: boolean }): Promise<MasterQuestion[]>;
+}
+
+export interface QuestionTranslationRepository {
+  upsert(translation: QuestionTranslation): Promise<QuestionTranslation>;
+  listByQuestion(questionId: string): Promise<QuestionTranslation[]>;
+  find(questionId: string, language: string): Promise<QuestionTranslation | undefined>;
+}
+
+export interface MasterAnswerRepository {
+  create(answer: MasterAnswer): Promise<MasterAnswer>;
+  update(id: string, patch: Partial<MasterAnswer>): Promise<MasterAnswer>;
+  findById(id: string): Promise<MasterAnswer | undefined>;
+  findByCode(code: string): Promise<MasterAnswer | undefined>;
+  list(filter?: { isActive?: boolean }): Promise<MasterAnswer[]>;
+}
+
+export interface AnswerTranslationRepository {
+  upsert(translation: AnswerTranslation): Promise<AnswerTranslation>;
+  listByAnswer(answerId: string): Promise<AnswerTranslation[]>;
+  find(answerId: string, language: string): Promise<AnswerTranslation | undefined>;
+}
+
+export interface QuestionAnswerMappingRepository {
+  create(mapping: QuestionAnswerMapping): Promise<QuestionAnswerMapping>;
+  update(id: string, patch: Partial<QuestionAnswerMapping>): Promise<QuestionAnswerMapping>;
+  findById(id: string): Promise<QuestionAnswerMapping | undefined>;
+  listByQuestion(questionId: string): Promise<QuestionAnswerMapping[]>;
+  list(filter?: { isActive?: boolean }): Promise<QuestionAnswerMapping[]>;
+}
+
+export interface ResolvedQuestionnaireQuestion {
+  questionId: string;
+  type: MasterQuestion['type'];
+  sequence: number;
+  text: string;
+  answers: { answerId: string; code: string; text: string }[];
+}
+
+export interface QuestionnaireConfigRepository {
+  create(config: QuestionnaireConfig): Promise<QuestionnaireConfig>;
+  update(id: string, patch: Partial<QuestionnaireConfig>): Promise<QuestionnaireConfig>;
+  findById(id: string): Promise<QuestionnaireConfig | undefined>;
+  list(filter?: { productCategoryId?: string; brandId?: string | null; partnerId?: string | null; isActive?: boolean }): Promise<QuestionnaireConfig[]>;
+  /**
+   * Core resolution: given a required productCategoryId and optional
+   * brandId/partnerId, finds the single most-specific matching tier (see
+   * types/domain.ts QuestionnaireConfig doc) and returns its questions,
+   * each with its answer options, sorted by sequence and translated into
+   * `language` (falling back to "en" when a translation is missing).
+   * Returns an empty array when no tier matches at all (e.g. unknown category).
+   */
+  resolve(productCategoryId: string, brandId: string | undefined, partnerId: string | undefined, language: string): Promise<ResolvedQuestionnaireQuestion[]>;
 }

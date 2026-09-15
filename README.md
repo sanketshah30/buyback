@@ -80,6 +80,17 @@ an audit trail every time a user moves between locations. It deliberately reuses
 vendor onboarding module" section in `server/README.md` for the full design rationale and
 API reference.
 
+## Questionnaire configuration module
+
+Backend-only for now: a config-driven engine (`questions` / `answers` / their
+translations / a question-answer mapping / a `questionnaire_config` resolution table)
+that decides which physical-assessment questions to show for a given product category +
+brand + partner, with a most-specific-tier-wins precedence rule and multi-language
+support. **Not yet wired into the live buyback flow** (which still uses the original
+hardcoded per-category questionnaire) or into valuation scoring - both are planned
+follow-up phases. See the "Questionnaire configuration module" section in
+`server/README.md` for the full precedence rules and API reference.
+
 ## Known MVP simplifications (documented for whoever wires up production)
 
 - All data lives in server memory and resets on restart - see "Why mock data?" above.

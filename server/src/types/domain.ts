@@ -255,6 +255,86 @@ export interface UserLocationHistory extends BaseEntity {
   changedByUserId?: string;
 }
 
+/**
+ * ---------------------------------------------------------------------
+ * Questionnaire configuration module
+ * ---------------------------------------------------------------------
+ * Named `Master*`/`*Mapping`/`QuestionnaireConfig` (rather than `Question`/
+ * `QuestionnaireAnswer`) to avoid colliding with the existing hardcoded
+ * per-category questionnaire types above, which the live buyback flow still
+ * uses today - this module is additive/config-only for now and isn't wired
+ * into the buyback flow or valuation engine yet (that integration, and
+ * scoring, is a follow-up phase).
+ *
+ * Language is deliberately NOT baked into the base Question/Answer rows -
+ * each is a language-agnostic "concept" with its display text supplied by
+ * separate translation tables (QuestionTranslation/AnswerTranslation), so a
+ * single Question-Answer mapping and a single category/brand/partner config
+ * works across every language without duplicating rows per language.
+ */
+
+/** Table: questions */
+export interface MasterQuestion extends BaseEntity {
+  type: QuestionType;
+}
+
+/** Table: question_translations. FK: questionId -> questions.id */
+export interface QuestionTranslation extends BaseEntity {
+  questionId: string;
+  language: string;
+  text: string;
+}
+
+/** Table: answers. `code` is a stable, language-independent key (e.g. "yes", "charger") for programmatic reference (e.g. by the future valuation engine). */
+export interface MasterAnswer extends BaseEntity {
+  code: string;
+}
+
+/** Table: answer_translations. FK: answerId -> answers.id */
+export interface AnswerTranslation extends BaseEntity {
+  answerId: string;
+  language: string;
+  text: string;
+}
+
+/**
+ * Table: question_answer_mapping
+ * A single row = "this Answer is a valid, selectable option for this Question".
+ * FKs: questionId -> questions.id, answerId -> answers.id
+ */
+export interface QuestionAnswerMapping extends BaseEntity {
+  questionId: string;
+  answerId: string;
+}
+
+/**
+ * Table: questionnaire_config
+ * Determines which Question-Answer options apply for a given Product
+ * Category (always required, exact match) + Brand + Partner, and in what
+ * order (`sequence`) the underlying question appears.
+ *
+ * `brandId`/`partnerId` are `null` to mean "applies to all" (the spec's
+ * "0" sentinel, adapted since Category/Brand/Partner IDs here are the real
+ * string IDs from the catalog/partner-onboarding modules, not integers).
+ * Resolution precedence (most to least specific), all requiring an exact
+ * Category match: (1) exact brand + exact partner, (2) wildcard brand +
+ * exact partner, (3) exact brand + wildcard partner, (4) wildcard brand +
+ * wildcard partner. Partner-specificity outranks brand-specificity when
+ * only one of the two is specific - see CatalogRepository-style
+ * `resolveQuestionnaire()` in the repository layer for the implementation.
+ *
+ * FKs: productCategoryId -> product_categories.id (required),
+ * brandId -> brands.id (nullable), partnerId -> partners.id (nullable),
+ * questionAnswerId -> question_answer_mapping.id
+ */
+export interface QuestionnaireConfig extends BaseEntity {
+  productCategoryId: string;
+  brandId: string | null;
+  partnerId: string | null;
+  questionAnswerId: string;
+  sequence: number;
+}
+
 export interface OtpChallenge {
   requestId: string;
   mobile: string;

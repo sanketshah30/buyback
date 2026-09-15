@@ -1,19 +1,31 @@
 import { env } from '../config/env';
+import { InMemoryAnswerTranslationRepository } from './inMemory/answerTranslation.repository';
 import { InMemoryBuybackRepository } from './inMemory/buyback.repository';
 import { InMemoryCatalogRepository } from './inMemory/catalog.repository';
+import { InMemoryMasterAnswerRepository } from './inMemory/masterAnswer.repository';
+import { InMemoryMasterQuestionRepository } from './inMemory/masterQuestion.repository';
 import { InMemoryOtpRepository } from './inMemory/otp.repository';
 import { InMemoryPartnerRepository } from './inMemory/partner.repository';
 import { InMemoryPartnerLocationRepository } from './inMemory/partnerLocation.repository';
+import { InMemoryQuestionAnswerMappingRepository } from './inMemory/questionAnswerMapping.repository';
+import { InMemoryQuestionTranslationRepository } from './inMemory/questionTranslation.repository';
+import { InMemoryQuestionnaireConfigRepository } from './inMemory/questionnaireConfig.repository';
 import { InMemoryRoleRepository } from './inMemory/role.repository';
 import { InMemoryUserRepository } from './inMemory/user.repository';
 import { InMemoryUserLocationHistoryRepository } from './inMemory/userLocationHistory.repository';
 import { InMemoryUserRoleRepository } from './inMemory/userRole.repository';
 import {
+  AnswerTranslationRepository,
   BuybackRepository,
   CatalogRepository,
+  MasterAnswerRepository,
+  MasterQuestionRepository,
   OtpRepository,
   PartnerLocationRepository,
   PartnerRepository,
+  QuestionAnswerMappingRepository,
+  QuestionTranslationRepository,
+  QuestionnaireConfigRepository,
   RoleRepository,
   UserLocationHistoryRepository,
   UserRepository,
@@ -48,3 +60,9 @@ export const partnerLocationRepository: PartnerLocationRepository = new InMemory
 export const roleRepository: RoleRepository = new InMemoryRoleRepository();
 export const userRoleRepository: UserRoleRepository = new InMemoryUserRoleRepository();
 export const userLocationHistoryRepository: UserLocationHistoryRepository = new InMemoryUserLocationHistoryRepository();
+export const masterQuestionRepository: MasterQuestionRepository = new InMemoryMasterQuestionRepository();
+export const questionTranslationRepository: QuestionTranslationRepository = new InMemoryQuestionTranslationRepository();
+export const masterAnswerRepository: MasterAnswerRepository = new InMemoryMasterAnswerRepository();
+export const answerTranslationRepository: AnswerTranslationRepository = new InMemoryAnswerTranslationRepository();
+export const questionAnswerMappingRepository: QuestionAnswerMappingRepository = new InMemoryQuestionAnswerMappingRepository();
+export const questionnaireConfigRepository: QuestionnaireConfigRepository = new InMemoryQuestionnaireConfigRepository();
