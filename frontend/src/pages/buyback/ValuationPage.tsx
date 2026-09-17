@@ -100,7 +100,7 @@ export function ValuationPage() {
   };
 
   return (
-    <PageShell title="Estimated value" subtitle={`Buyback ID: ${effectiveData.displayId ?? '—'}`}>
+    <PageShell title="Estimated value" subtitle={`Buyback ID: ${effectiveData.referenceId ?? '—'}`}>
       <ProgressSteps current={4} total={7} />
 
       <div className="value-hero">

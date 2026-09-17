@@ -109,7 +109,7 @@ export interface CustomerInfo {
 
 export interface BuybackRequest {
   id: number;
-  displayId?: string;
+  referenceId?: string;
   userId: number;
   status: BuybackStatus;
   category?: Category;

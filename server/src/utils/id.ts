@@ -5,7 +5,7 @@ export function dateKey(date = new Date()): string {
   return `${y}${m}${d}`;
 }
 
-/** Formats a buyback display ID as {{YYYYMMDD}}-{{Count}}, per the product spec. */
-export function formatBuybackDisplayId(sequence: number, date = new Date()): string {
+/** Formats a buyback reference ID as {{YYYYMMDD}}-{{Count}}, per the product spec. */
+export function formatBuybackReferenceId(sequence: number, date = new Date()): string {
   return `${dateKey(date)}-${sequence}`;
 }

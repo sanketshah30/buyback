@@ -74,7 +74,7 @@ export function CustomerInfoPage() {
       <div className="value-hero" style={{ paddingTop: 12, paddingBottom: 0 }}>
         <span className="value-hero__label">Final value</span>
         <span className="value-hero__amount">₹{data.finalValue}</span>
-        <span className="value-hero__id">Buyback ID: {data.displayId}</span>
+        <span className="value-hero__id">Buyback ID: {data.referenceId}</span>
       </div>
 
       <div className="field-group">

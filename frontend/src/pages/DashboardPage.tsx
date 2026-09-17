@@ -117,7 +117,7 @@ export function DashboardPage() {
                 <Card key={request.id}>
                   <div className="dashboard-list__row">
                     <div>
-                      <strong>{request.displayId}</strong>
+                      <strong>{request.referenceId}</strong>
                       <p>
                         {request.product?.name} · {request.sku?.label}
                       </p>

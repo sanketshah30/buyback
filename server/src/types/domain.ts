@@ -156,7 +156,8 @@ export interface CustomerInfo {
 /** Table: buyback_requests. FK: userId -> users.id (indexed - history is always looked up per user). */
 export interface BuybackRequest {
   id: number;
-  displayId?: string;
+  /** Human-facing {{YYYYMMDD}}-{{Count}} reference (e.g. "20260917-1") - generated at valuation time, distinct from the internal integer `id`. */
+  referenceId?: string;
   userId: number;
   status: BuybackStatus;
   category?: Category;

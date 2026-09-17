@@ -44,7 +44,7 @@ export function ReviewPage() {
   return (
     <PageShell
       title="Review & confirm"
-      subtitle={`Buyback ID: ${data.displayId}`}
+      subtitle={`Buyback ID: ${data.referenceId}`}
       footer={
         <>
           {error && <Banner tone="error">{error}</Banner>}

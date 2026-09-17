@@ -9,7 +9,7 @@ import { diagnosisService } from '../services/diagnosis.service';
 import { notificationService } from '../services/notification.service';
 import { applyDiagnosisAdjustment, applyNoDiagnosisDrop, computeMaxValue, resolveBestVendorPrice } from '../services/valuation.service';
 import { BuybackRequest, QuestionnaireAnswer } from '../types/domain';
-import { dateKey, formatBuybackDisplayId } from '../utils/id';
+import { dateKey, formatBuybackReferenceId } from '../utils/id';
 import { nextId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
@@ -284,10 +284,10 @@ buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
     const maxValue = computeMaxValue(vendorPrice.price, questions, request.questionnaireAnswers);
 
     const sequence = await buybackRepository.nextDailySequence(dateKey());
-    const displayId = formatBuybackDisplayId(sequence);
+    const referenceId = formatBuybackReferenceId(sequence);
 
     const updated = await buybackRepository.update(request.id, {
-      displayId,
+      referenceId,
       maxValue,
       selectedVendorId: vendorPrice.vendorId,
       status: 'valuation_ready',
