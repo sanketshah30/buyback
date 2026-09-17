@@ -12,6 +12,7 @@ import { depreciationConfigRouter } from './routes/depreciationConfig.routes';
 import { depreciationMatrixRouter } from './routes/depreciationMatrix.routes';
 import { partnerCategoryVendorMappingRouter } from './routes/partnerCategoryVendorMapping.routes';
 import { partnerLocationsRouter } from './routes/partnerLocations.routes';
+import { partnerMarginConfigRouter } from './routes/partnerMarginConfig.routes';
 import { partnersRouter } from './routes/partners.routes';
 import { questionAnswersRouter } from './routes/questionAnswers.routes';
 import { questionnaireConfigRouter } from './routes/questionnaireConfig.routes';
@@ -20,6 +21,7 @@ import { rolesRouter } from './routes/roles.routes';
 import { skuPricingRouter } from './routes/skuPricing.routes';
 import { uploadsRouter } from './routes/uploads.routes';
 import { usersRouter } from './routes/users.routes';
+import { vendorFeeConfigRouter } from './routes/vendorFeeConfig.routes';
 
 export function createApp() {
   const app = express();
@@ -61,6 +63,11 @@ export function createApp() {
   // deductions, uploaded as a batch and versioned on re-upload.
   app.use('/api/depreciation-config', depreciationConfigRouter);
   app.use('/api/depreciation-matrix', depreciationMatrixRouter);
+  // Partner margin (retailer's commission %) and vendor fee (vendor's fixed
+  // operating fee) - the final two inputs to the allocate phase's Retailer/
+  // Customer/Vendor-payable value split. See "Buyback request creation engine".
+  app.use('/api/partner-margin-config', partnerMarginConfigRouter);
+  app.use('/api/vendor-fee-config', vendorFeeConfigRouter);
   // Uploaded ID documents / device photos - authenticated + ownership-checked,
   // never served as public static content. See routes/uploads.routes.ts.
   app.use('/api/uploads', uploadsRouter);

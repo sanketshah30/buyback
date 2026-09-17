@@ -9,6 +9,7 @@ import {
   questionTranslations,
   questionnaireConfigs,
 } from '../../data/questionnaireConfig.seed';
+import { partnerMarginConfigs, vendorFeeConfigs } from '../../data/partnerFinancials.seed';
 import { requestStatuses } from '../../data/requestStatus.seed';
 import { users, userRoles as seededUserRoles } from '../../data/user.seed';
 import { partnerCategoryVendorMappings, skuPricing } from '../../data/vendorPricing.seed';
@@ -31,6 +32,7 @@ import {
   RequestStatusMaster,
   Role,
   PartnerCategoryVendorMapping,
+  PartnerMarginConfig,
   Session,
   Sku,
   SkuAlias,
@@ -38,6 +40,7 @@ import {
   User,
   UserLocationHistory,
   UserRole,
+  VendorFeeConfig,
 } from '../../types/domain';
 import { addToIndex, Index } from './indexUtils';
 
@@ -91,6 +94,9 @@ export const tables = {
   requestStatusMaster: new Map<number, RequestStatusMaster>(requestStatuses.map((s) => [s.id, s])),
   buybackStatusHistory: new Map<number, BuybackStatusHistory>(),
   buybackVendorCalculationLog: new Map<number, BuybackVendorCalculationLog>(),
+
+  partnerMarginConfigs: new Map<number, PartnerMarginConfig>(partnerMarginConfigs.map((c) => [c.id, c])),
+  vendorFeeConfigs: new Map<number, VendorFeeConfig>(vendorFeeConfigs.map((c) => [c.id, c])),
 };
 
 /** Secondary indexes - see the module doc comment above. */
@@ -137,6 +143,11 @@ export const indexes = {
 
   buybackStatusHistoryByBuybackRequestId: new Map<number, Set<number>>() as Index<number>,
   buybackVendorCalculationLogByBuybackRequestId: new Map<number, Set<number>>() as Index<number>,
+
+  // Composite index matching PartnerMarginConfigRepository.resolve(): `${partnerId}:${partnerLocationId}:${productCategoryId}` - partnerLocationId is a literal 0 sentinel here, never null (see PartnerMarginConfig doc comment).
+  partnerMarginConfigsByScope: new Map<string, Set<number>>() as Index<string>,
+  // Composite index matching VendorFeeConfigRepository.resolve(): `${vendorId}:${productCategoryId}`
+  vendorFeeConfigsByScope: new Map<string, Set<number>>() as Index<string>,
 };
 
 export function profileKey(categoryId: number, brandId: number | null, partnerId: number | null): string {
@@ -199,4 +210,10 @@ for (const pricing of skuPricing) {
   addToIndex(indexes.skuPricingByVendorId, pricing.vendorId, pricing.id);
   addToIndex(indexes.skuPricingBySkuId, pricing.skuId, pricing.id);
   addToIndex(indexes.skuPricingByVendorSku, `${pricing.vendorId}:${pricing.skuId}`, pricing.id);
+}
+for (const config of partnerMarginConfigs) {
+  addToIndex(indexes.partnerMarginConfigsByScope, `${config.partnerId}:${config.partnerLocationId}:${config.productCategoryId}`, config.id);
+}
+for (const config of vendorFeeConfigs) {
+  addToIndex(indexes.vendorFeeConfigsByScope, `${config.vendorId}:${config.productCategoryId}`, config.id);
 }

@@ -13,6 +13,7 @@ import {
   Partner,
   PartnerLocation,
   PartnerCategoryVendorMapping,
+  PartnerMarginConfig,
   PartnerType,
   Product,
   QuestionAnswerMapping,
@@ -25,6 +26,7 @@ import {
   SkuAlias,
   SkuPricing,
   User,
+  VendorFeeConfig,
   UserLocationHistory,
   UserRole,
 } from '../types/domain';
@@ -218,6 +220,25 @@ export interface BuybackStatusHistoryRepository {
 export interface BuybackVendorCalculationLogRepository {
   record(entry: BuybackVendorCalculationLog): Promise<BuybackVendorCalculationLog>;
   listByBuybackRequest(buybackRequestId: number): Promise<BuybackVendorCalculationLog[]>;
+}
+
+export interface PartnerMarginConfigRepository {
+  create(config: PartnerMarginConfig): Promise<PartnerMarginConfig>;
+  update(id: number, patch: Partial<PartnerMarginConfig>): Promise<PartnerMarginConfig>;
+  findById(id: number): Promise<PartnerMarginConfig | undefined>;
+  findByScope(partnerId: number, partnerLocationId: number, productCategoryId: number): Promise<PartnerMarginConfig | undefined>;
+  list(filter?: { partnerId?: number; partnerLocationId?: number; productCategoryId?: number; isActive?: boolean }): Promise<PartnerMarginConfig[]>;
+  /** Exact (partnerId, partnerLocationId, productCategoryId) match, falling back to the partnerLocationId=0 "all locations" wildcard. */
+  resolve(partnerId: number, partnerLocationId: number, productCategoryId: number): Promise<PartnerMarginConfig | undefined>;
+}
+
+export interface VendorFeeConfigRepository {
+  create(config: VendorFeeConfig): Promise<VendorFeeConfig>;
+  update(id: number, patch: Partial<VendorFeeConfig>): Promise<VendorFeeConfig>;
+  findById(id: number): Promise<VendorFeeConfig | undefined>;
+  findByScope(vendorId: number, productCategoryId: number): Promise<VendorFeeConfig | undefined>;
+  list(filter?: { vendorId?: number; productCategoryId?: number; isActive?: boolean }): Promise<VendorFeeConfig[]>;
+  resolve(vendorId: number, productCategoryId: number): Promise<VendorFeeConfig | undefined>;
 }
 
 export interface DepreciationConfigRepository {

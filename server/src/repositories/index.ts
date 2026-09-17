@@ -12,6 +12,7 @@ import { InMemoryOtpRepository } from './inMemory/otp.repository';
 import { InMemoryPartnerRepository } from './inMemory/partner.repository';
 import { InMemoryPartnerCategoryVendorMappingRepository } from './inMemory/partnerCategoryVendorMapping.repository';
 import { InMemoryPartnerLocationRepository } from './inMemory/partnerLocation.repository';
+import { InMemoryPartnerMarginConfigRepository } from './inMemory/partnerMarginConfig.repository';
 import { InMemoryQuestionAnswerMappingRepository } from './inMemory/questionAnswerMapping.repository';
 import { InMemoryQuestionTranslationRepository } from './inMemory/questionTranslation.repository';
 import { InMemoryQuestionnaireConfigRepository } from './inMemory/questionnaireConfig.repository';
@@ -22,6 +23,7 @@ import { InMemorySkuPricingRepository } from './inMemory/skuPricing.repository';
 import { InMemoryUserRepository } from './inMemory/user.repository';
 import { InMemoryUserLocationHistoryRepository } from './inMemory/userLocationHistory.repository';
 import { InMemoryUserRoleRepository } from './inMemory/userRole.repository';
+import { InMemoryVendorFeeConfigRepository } from './inMemory/vendorFeeConfig.repository';
 import {
   AnswerTranslationRepository,
   BuybackRepository,
@@ -35,6 +37,7 @@ import {
   OtpRepository,
   PartnerCategoryVendorMappingRepository,
   PartnerLocationRepository,
+  PartnerMarginConfigRepository,
   PartnerRepository,
   QuestionAnswerMappingRepository,
   QuestionTranslationRepository,
@@ -46,6 +49,7 @@ import {
   UserLocationHistoryRepository,
   UserRepository,
   UserRoleRepository,
+  VendorFeeConfigRepository,
 } from './interfaces';
 
 /**
@@ -90,3 +94,5 @@ export const depreciationMatrixRepository: DepreciationMatrixRepository = new In
 export const requestStatusMasterRepository: RequestStatusMasterRepository = new InMemoryRequestStatusMasterRepository();
 export const buybackStatusHistoryRepository: BuybackStatusHistoryRepository = new InMemoryBuybackStatusHistoryRepository();
 export const buybackVendorCalculationLogRepository: BuybackVendorCalculationLogRepository = new InMemoryBuybackVendorCalculationLogRepository();
+export const partnerMarginConfigRepository: PartnerMarginConfigRepository = new InMemoryPartnerMarginConfigRepository();
+export const vendorFeeConfigRepository: VendorFeeConfigRepository = new InMemoryVendorFeeConfigRepository();

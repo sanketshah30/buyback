@@ -22,6 +22,7 @@ src/
   data/vendorPricing.seed.ts  Partner->vendor mappings + per-vendor SKU pricing
   data/depreciation.seed.ts   Depreciation config sets + their question-answer matrix
   data/requestStatus.seed.ts  The 12-row buyback status lifecycle master list
+  data/partnerFinancials.seed.ts  Partner margin % + vendor fee configs
   services/buybackEngine.service.ts  register()/calculate()/allocate() - see "Buyback request creation engine"
   repositories/           Data-access interfaces + in-memory implementation
     interfaces.ts          <- contracts a future MySQL implementation must satisfy
@@ -342,10 +343,27 @@ phases, not three separate endpoints, since that's the live flow's single trigge
    absolute deductions across different question-answers. Every evaluated vendor is
    logged to `buyback_vendor_calculation_log` (not just the winner), so the eventual
    allocation stays fully auditable - see `GET /api/buyback/:id/vendor-calculations`.
-3. **allocate** - picks the candidate with the highest `buybackValue` (ties broken by the
-   lowest `vendorId`) and writes it onto the parent `BuybackRequest`
-   (`maxValue`, `allocatedVendorId`), advancing `requestStatusId` to **"Amount
-   Calculated"**.
+3. **allocate** - picks the candidate with the highest `buybackValue` (this is the
+   **"Retailer" value** - ties broken by the lowest `vendorId`), then derives two more
+   values and writes all three onto the parent `BuybackRequest`, advancing
+   `requestStatusId` to **"Amount Calculated"**:
+
+   ```
+   Retailer value  = winning candidate's buybackValue (SKU pricing - total depreciation)
+   Customer value  = Retailer value - (Retailer value * partner margin %)
+   Vendor payable  = Retailer value + vendor fee
+   ```
+
+   **Partner margin** (`partner_margin_config`) is the retail partner's commission,
+   resolved for the registering promoter's own (partnerId, partnerLocationId, category) -
+   an exact location match wins, falling back to the `partnerLocationId = 0` "all
+   locations" wildcard row, and defaulting to 0% if nothing is configured at all.
+   **Vendor fee** (`vendor_fee_config`) is a fixed amount added on top, resolved for
+   (the *allocated* vendor, category) only - **never for every evaluated candidate**,
+   since it only matters once a vendor has actually won the allocation. `maxValue` is set
+   equal to `customerValue` - the rest of the flow (diagnosis adjustment, `finalValue`,
+   every customer-facing screen) already reads `maxValue`, and what a customer actually
+   receives is the Customer value, not the Retailer value.
 
 If no vendor is mapped to the promoter's location for that category, or none of the
 mapped vendors has priced the SKU, the whole call fails with a `422` rather than silently
@@ -357,21 +375,37 @@ buyback_requests ──1:N──▶ buyback_vendor_calculation_log ──▶ par
         │                   sku_pricing  depreciation_config (nullable)
         │
         └──1:N──▶ buyback_status_history ──▶ request_status_master
+
+partners ──┐                              partners (vendor) ──┐
+           ├──▶ partner_margin_config      product_categories ──┼──▶ vendor_fee_config
+partner_locations (0 = wildcard) ──┘       product_categories ──┘
 ```
 
 | Table | Description | Foreign keys |
 | --- | --- | --- |
 | `request_status_master` | The full formal buyback lifecycle (12 rows, in `sequence` order) - only "Request Created" and "Amount Calculated" are wired into the live flow so far; the rest (diagnosis, logistics, payout) are seeded for upcoming phases | - |
 | `buyback_status_history` | Append-only log of every `requestStatusId` transition a request goes through | `buybackRequestId` → buyback_requests.id, `requestStatusId` → request_status_master.id, `changedByUserId` → users.id |
-| `buyback_vendor_calculation_log` | One row per (buyback request, evaluated vendor) from the calculate phase - `skuPrice`, `totalDepreciationAmount`, and the final `buybackValue` are all stored, not just the final number, for full auditability | `buybackRequestId` → buyback_requests.id, `vendorId` → partners.id, `skuPricingId` → sku_pricing.id, `depreciationConfigId` → depreciation_config.id (nullable - a vendor may have no depreciation set configured at all, treated as zero deduction) |
+| `buyback_vendor_calculation_log` | One row per (buyback request, evaluated vendor) from the calculate phase - `skuPrice`, `totalDepreciationAmount`, and the final `buybackValue` (the Retailer value) are all stored, not just the final number, for full auditability | `buybackRequestId` → buyback_requests.id, `vendorId` → partners.id, `skuPricingId` → sku_pricing.id, `depreciationConfigId` → depreciation_config.id (nullable - a vendor may have no depreciation set configured at all, treated as zero deduction) |
+| `partner_margin_config` | The retail partner's commission %, deducted from Retailer value to get Customer value. `partnerLocationId` is a **literal, non-nullable `0` sentinel** ("applies to all of this partner's locations") - a deliberate departure from this codebase's usual `null`-wildcard convention, since it was specified that way; an exact location match still wins over the `0` row when both exist | `partnerId` → partners.id, `partnerLocationId` → partner_locations.id (or literal `0`), `productCategoryId` → product_categories.id |
+| `vendor_fee_config` | A vendor's fixed fee, added to Retailer value to get Vendor payable - always vendor + category exact match, no wildcard | `vendorId` → partners.id (vendor), `productCategoryId` → product_categories.id |
+
+Both new configs are simple, non-versioned config values (unlike `sku_pricing`/
+`depreciation_config`'s validity windows) - `POST /` returns the existing row (200) if one
+already exists for the exact same scope, rather than creating a conflicting duplicate;
+`PATCH /:id` is how you change the percentage/fee in place. Each also exposes a
+`POST .../resolve` matching the allocate phase's lookup: `partner-margin-config/resolve`
+(body `{ partnerId, partnerLocationId?, productCategoryId }` - `partnerLocationId`
+defaults to `0`) and `vendor-fee-config/resolve` (body `{ vendorId, productCategoryId }`).
 
 `BuybackRequest` itself gained `requestStatusId` (nullable - unset while the request is
 still a local, unsaved draft; only ever one of `request_status_master`'s 12 values once
-registered), `partnerLocationId`, and `allocatedVendorId` (renamed from the earlier
-placeholder's `selectedVendorId`). Its original `status` string field is untouched and
-keeps tracking the live wizard's granular UI-flow steps (`draft`, `device_captured`, ...,
-`confirmed`) - `requestStatusId` is a separate, additive, more formal lifecycle status,
-per an explicit scoping decision to keep the two independent for now.
+registered), `partnerLocationId`, `allocatedVendorId` (renamed from the earlier
+placeholder's `selectedVendorId`), and the three captured values: `retailerValue`,
+`customerValue`, `vendorPayable` (`maxValue` mirrors `customerValue`, per above). Its
+original `status` string field is untouched and keeps tracking the live wizard's granular
+UI-flow steps (`draft`, `device_captured`, ..., `confirmed`) - `requestStatusId` is a
+separate, additive, more formal lifecycle status, per an explicit scoping decision to keep
+the two independent for now.
 
 **The questionnaire assessment step is now backed entirely by the normalized
 questionnaire-config module** (no more hardcoded per-category question/answer codes):
@@ -462,6 +496,16 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `POST /api/buyback/:id/valuation` | Runs the full register → calculate → allocate engine (see below) and returns the updated request |
 | `GET /api/buyback/:id/vendor-calculations` | Every vendor candidate the calculate phase evaluated, for auditing the allocation decision |
 | `GET /api/buyback/:id/status-history` | Every `requestStatusId` transition this request has gone through |
+| `POST /api/partner-margin-config` | Create a partner margin % (body: `{ partnerId, partnerLocationId?, productCategoryId, marginPercent }` - `partnerLocationId` defaults to `0` = all locations) |
+| `PATCH /api/partner-margin-config/:id` | Update a margin % or deactivate it |
+| `GET /api/partner-margin-config/:id` | Fetch a margin config row |
+| `POST /api/partner-margin-config/search` | List/filter margin configs |
+| `POST /api/partner-margin-config/resolve` | Calc-engine lookup: exact location match, falling back to the `0` wildcard |
+| `POST /api/vendor-fee-config` | Create a vendor fee (body: `{ vendorId, productCategoryId, feeAmount }`) |
+| `PATCH /api/vendor-fee-config/:id` | Update a fee or deactivate it |
+| `GET /api/vendor-fee-config/:id` | Fetch a fee config row |
+| `POST /api/vendor-fee-config/search` | List/filter fee configs |
+| `POST /api/vendor-fee-config/resolve` | Calc-engine lookup: exact (vendorId, productCategoryId) match |
 | `POST /api/buyback/:id/diagnosis/initiate` | Start the optional QR-based diagnosis |
 | `GET /api/buyback/:id/diagnosis/status` | Poll diagnosis progress/result |
 | `POST /api/buyback/:id/finalize-value` | Apply the no-diagnosis value drop |
@@ -534,7 +578,7 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `GET /api/depreciation-matrix/:id` | Fetch a single deduction |
 | `POST /api/depreciation-matrix/search` | List/filter deductions (body: `{ depreciationConfigId?, questionAnswerId?, isActive? }`) |
 
-All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, `/api/questionnaire-config/*`, `/api/partner-category-vendor-mapping/*`, `/api/sku-pricing/*`, `/api/depreciation-config/*`, and `/api/depreciation-matrix/*` routes require `Authorization: Bearer <token>` from the OTP login flow. `/api/buyback/*` additionally requires the caller's role to grant the `process_buyback` right (see "Authentication, sessions & role-based access" above).
+All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, `/api/questionnaire-config/*`, `/api/partner-category-vendor-mapping/*`, `/api/sku-pricing/*`, `/api/depreciation-config/*`, `/api/depreciation-matrix/*`, `/api/partner-margin-config/*`, and `/api/vendor-fee-config/*` routes require `Authorization: Bearer <token>` from the OTP login flow. `/api/buyback/*` additionally requires the caller's role to grant the `process_buyback` right (see "Authentication, sessions & role-based access" above).
 
 ### When does a buyback record actually get created?
 

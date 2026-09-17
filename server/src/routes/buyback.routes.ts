@@ -297,7 +297,7 @@ buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
 
     request = await buybackEngine.register(request, location.id, userId);
     const candidates = await buybackEngine.calculate(request, location.id, answers, new Date());
-    const allocated = await buybackEngine.allocate(request, candidates, userId);
+    const allocated = await buybackEngine.allocate(request, candidates, location, userId);
 
     return res.json(allocated);
   } catch (err) {

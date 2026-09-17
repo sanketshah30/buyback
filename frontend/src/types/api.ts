@@ -120,8 +120,12 @@ export interface BuybackRequest {
   aiAssessment?: AiAssessmentResult;
   assessmentImageUrls?: string[];
   assessmentVideoUrl?: string;
+  /** The customer-facing value - equal to customerValue below. */
   maxValue?: number;
   allocatedVendorId?: number;
+  retailerValue?: number;
+  customerValue?: number;
+  vendorPayable?: number;
   withDiagnosis?: boolean;
   diagnosis?: DiagnosisState;
   finalValue?: number;

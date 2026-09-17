@@ -4,9 +4,11 @@ import {
   buybackStatusHistoryRepository,
   buybackVendorCalculationLogRepository,
   partnerCategoryVendorMappingRepository,
+  partnerMarginConfigRepository,
   skuPricingRepository,
+  vendorFeeConfigRepository,
 } from '../repositories';
-import { BuybackRequest, BuybackVendorCalculationLog, QuestionnaireAnswer } from '../types/domain';
+import { BuybackRequest, BuybackVendorCalculationLog, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
 import { dateKey, formatBuybackReferenceId } from '../utils/id';
 import { nextId } from '../utils/idGenerator';
 import { depreciationService } from './depreciation.service';
@@ -130,16 +132,50 @@ export async function calculate(
 
 /**
  * Phase 3: allocate. Picks the candidate with the highest `buybackValue`
- * (ties broken by the lowest `vendorId`) and writes it onto the parent
- * `BuybackRequest` (`maxValue`, `allocatedVendorId`), advancing
- * `requestStatusId` to "Amount Calculated".
+ * ("Retailer" value - ties broken by the lowest `vendorId`) and derives
+ * the other two values the parent request needs to capture:
+ *
+ *   Retailer value = winner.buybackValue (SKU pricing - total depreciation, already computed by calculate())
+ *   Customer value = Retailer value - (Retailer value * partner margin %)
+ *   Vendor payable = Retailer value + vendor fee
+ *
+ * Partner margin is resolved for the registering promoter's own
+ * (partnerId, partnerLocationId, category) - exact location match, falling
+ * back to the partnerLocationId=0 "all locations" wildcard - and defaults
+ * to 0% if none is configured. Vendor fee is resolved for
+ * (winner.vendorId, category) and defaults to 0 if unconfigured - **only
+ * ever for the allocated vendor**, never every candidate.
+ *
+ * `maxValue` is set equal to `customerValue` - the rest of the flow
+ * (diagnosis adjustment, `finalValue`, every customer-facing screen)
+ * already reads `maxValue`, and what a customer actually receives is the
+ * Customer value, not the Retailer value.
  */
-export async function allocate(request: BuybackRequest, candidates: BuybackVendorCalculationLog[], changedByUserId: number): Promise<BuybackRequest> {
+export async function allocate(
+  request: BuybackRequest,
+  candidates: BuybackVendorCalculationLog[],
+  location: PartnerLocation,
+  changedByUserId: number,
+): Promise<BuybackRequest> {
+  if (!request.category) {
+    throw Object.assign(new Error('Category must be selected before allocation'), { status: 400 });
+  }
   const winner = [...candidates].sort((a, b) => b.buybackValue - a.buybackValue || a.vendorId - b.vendorId)[0];
+  const retailerValue = winner.buybackValue;
+
+  const marginConfig = await partnerMarginConfigRepository.resolve(location.partnerId, location.id, request.category.id);
+  const marginPercent = marginConfig?.marginPercent ?? 0;
+  const customerValue = Math.max(0, Math.round(retailerValue - (retailerValue * marginPercent) / 100));
+
+  const feeConfig = await vendorFeeConfigRepository.resolve(winner.vendorId, request.category.id);
+  const vendorPayable = Math.max(0, Math.round(retailerValue + (feeConfig?.feeAmount ?? 0)));
 
   const updated = await buybackRepository.update(request.id, {
-    maxValue: winner.buybackValue,
+    maxValue: customerValue,
     allocatedVendorId: winner.vendorId,
+    retailerValue,
+    customerValue,
+    vendorPayable,
     requestStatusId: REQUEST_STATUS_AMOUNT_CALCULATED_ID,
     status: 'valuation_ready',
   });

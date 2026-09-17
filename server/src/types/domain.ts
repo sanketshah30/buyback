@@ -175,10 +175,21 @@ export interface BuybackRequest {
   aiAssessment?: AiAssessmentResult;
   assessmentImageUrls?: string[];
   assessmentVideoUrl?: string;
-  /** The allocated vendor's buyback value, set by the allocate phase - see buybackEngine.service.ts. */
+  /**
+   * The customer-facing buyback value - **equal to `customerValue` below**,
+   * kept as its own field since it's what the rest of the flow (diagnosis
+   * adjustment, `finalValue`, every customer-facing screen) already reads
+   * and adjusts. See buybackEngine.service.ts's allocate phase.
+   */
   maxValue?: number;
-  /** The vendor allocated the device, per the highest computed buyback value - see buybackEngine.service.ts. FK: partners.id. */
+  /** The vendor allocated the device, per the highest computed Retailer value - see buybackEngine.service.ts. FK: partners.id. */
   allocatedVendorId?: number;
+  /** SKU pricing - total depreciation, for the allocated vendor. What the retail partner's side of the transaction is worth before their margin. */
+  retailerValue?: number;
+  /** retailerValue - partner margin. What's actually paid out to the customer - see `maxValue` above, which mirrors this. */
+  customerValue?: number;
+  /** retailerValue + vendor fee. What we owe the allocated vendor - only ever computed for the vendor that won allocation, never every candidate. */
+  vendorPayable?: number;
   withDiagnosis?: boolean;
   diagnosis?: DiagnosisState;
   finalValue?: number;
@@ -564,6 +575,51 @@ export interface BuybackVendorCalculationLog extends BaseEntity {
   totalDepreciationAmount: number;
   /** max(0, skuPrice - totalDepreciationAmount) - this vendor's candidate buyback value. */
   buybackValue: number;
+}
+
+/**
+ * ---------------------------------------------------------------------
+ * Partner margin & vendor fee configs (the final two inputs to the
+ * calculation engine's allocate phase)
+ * ---------------------------------------------------------------------
+ */
+
+/**
+ * Table: partner_margin_config
+ * The retail partner's commission, as a percentage deducted from the
+ * "Retailer" buyback value to arrive at the "Customer" value actually paid
+ * out to the walk-in customer. FKs: partnerId -> partners.id,
+ * partnerLocationId -> partner_locations.id, **but `0` is a literal,
+ * non-nullable sentinel meaning "applies to every location of this
+ * partner"** (a deliberate departure from this codebase's usual `null`
+ * wildcard convention, since it was specified that way), productCategoryId
+ * -> product_categories.id (always required, exact match). An exact
+ * location match takes precedence over a location=0 wildcard row for the
+ * same partner+category - see `PartnerMarginConfigRepository.resolve()`.
+ * Indexed on the (partnerId, partnerLocationId, productCategoryId)
+ * composite - the resolve lookup's exact key.
+ */
+export interface PartnerMarginConfig extends BaseEntity {
+  partnerId: number;
+  /** `0` = applies to all of this partner's locations. */
+  partnerLocationId: number;
+  productCategoryId: number;
+  marginPercent: number;
+}
+
+/**
+ * Table: vendor_fee_config
+ * A vendor's fixed operating fee, in absolute currency, added on top of
+ * the "Retailer" buyback value to arrive at what we actually pay that
+ * vendor ("Vendor payable"). FKs: vendorId -> partners.id (vendor),
+ * productCategoryId -> product_categories.id (both always required, exact
+ * match - no wildcard). Indexed on the (vendorId, productCategoryId)
+ * composite.
+ */
+export interface VendorFeeConfig extends BaseEntity {
+  vendorId: number;
+  productCategoryId: number;
+  feeAmount: number;
 }
 
 export interface OtpChallenge {
