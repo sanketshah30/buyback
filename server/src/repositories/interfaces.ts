@@ -3,6 +3,8 @@ import {
   Brand,
   BuybackRequest,
   Category,
+  DepreciationConfig,
+  DepreciationMatrixEntry,
   MasterAnswer,
   MasterQuestion,
   OtpChallenge,
@@ -198,4 +200,21 @@ export interface SkuPricingRepository {
   list(filter?: { vendorId?: number; skuId?: number; isActive?: boolean }): Promise<SkuPricing[]>;
   /** All active price rows for this vendor + SKU (not yet filtered by validity window - the caller decides "as of" which date). */
   listForVendorSku(vendorId: number, skuId: number): Promise<SkuPricing[]>;
+}
+
+export interface DepreciationConfigRepository {
+  create(config: DepreciationConfig): Promise<DepreciationConfig>;
+  update(id: number, patch: Partial<DepreciationConfig>): Promise<DepreciationConfig>;
+  findById(id: number): Promise<DepreciationConfig | undefined>;
+  list(filter?: { productCategoryId?: number; brandId?: number; vendorId?: number | null; isActive?: boolean }): Promise<DepreciationConfig[]>;
+  /** The single currently-open (validTo blank) set for this exact (category, brand, vendor) triple, if any - used by upload() to know what to version/close out. */
+  findActive(productCategoryId: number, brandId: number, vendorId: number | null): Promise<DepreciationConfig | undefined>;
+}
+
+export interface DepreciationMatrixRepository {
+  create(entry: DepreciationMatrixEntry): Promise<DepreciationMatrixEntry>;
+  update(id: number, patch: Partial<DepreciationMatrixEntry>): Promise<DepreciationMatrixEntry>;
+  findById(id: number): Promise<DepreciationMatrixEntry | undefined>;
+  list(filter?: { depreciationConfigId?: number; questionAnswerId?: number; isActive?: boolean }): Promise<DepreciationMatrixEntry[]>;
+  listByConfig(depreciationConfigId: number): Promise<DepreciationMatrixEntry[]>;
 }

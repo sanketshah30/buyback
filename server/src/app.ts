@@ -8,6 +8,8 @@ import { authRouter } from './routes/auth.routes';
 import { buybackRouter } from './routes/buyback.routes';
 import { catalogRouter } from './routes/catalog.routes';
 import { answersRouter } from './routes/answers.routes';
+import { depreciationConfigRouter } from './routes/depreciationConfig.routes';
+import { depreciationMatrixRouter } from './routes/depreciationMatrix.routes';
 import { partnerCategoryVendorMappingRouter } from './routes/partnerCategoryVendorMapping.routes';
 import { partnerLocationsRouter } from './routes/partnerLocations.routes';
 import { partnersRouter } from './routes/partners.routes';
@@ -55,6 +57,10 @@ export function createApp() {
   // each vendor's price per SKU - inputs to the upcoming valuation engine.
   app.use('/api/partner-category-vendor-mapping', partnerCategoryVendorMappingRouter);
   app.use('/api/sku-pricing', skuPricingRouter);
+  // Depreciation module: category/brand/vendor?-scoped question-answer
+  // deductions, uploaded as a batch and versioned on re-upload.
+  app.use('/api/depreciation-config', depreciationConfigRouter);
+  app.use('/api/depreciation-matrix', depreciationMatrixRouter);
   // Uploaded ID documents / device photos - authenticated + ownership-checked,
   // never served as public static content. See routes/uploads.routes.ts.
   app.use('/api/uploads', uploadsRouter);

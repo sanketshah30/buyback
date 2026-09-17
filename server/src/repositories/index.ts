@@ -2,6 +2,8 @@ import { env } from '../config/env';
 import { InMemoryAnswerTranslationRepository } from './inMemory/answerTranslation.repository';
 import { InMemoryBuybackRepository } from './inMemory/buyback.repository';
 import { InMemoryCatalogRepository } from './inMemory/catalog.repository';
+import { InMemoryDepreciationConfigRepository } from './inMemory/depreciationConfig.repository';
+import { InMemoryDepreciationMatrixRepository } from './inMemory/depreciationMatrix.repository';
 import { InMemoryMasterAnswerRepository } from './inMemory/masterAnswer.repository';
 import { InMemoryMasterQuestionRepository } from './inMemory/masterQuestion.repository';
 import { InMemoryOtpRepository } from './inMemory/otp.repository';
@@ -21,6 +23,8 @@ import {
   AnswerTranslationRepository,
   BuybackRepository,
   CatalogRepository,
+  DepreciationConfigRepository,
+  DepreciationMatrixRepository,
   MasterAnswerRepository,
   MasterQuestionRepository,
   OtpRepository,
@@ -75,3 +79,5 @@ export const questionAnswerMappingRepository: QuestionAnswerMappingRepository = 
 export const questionnaireConfigRepository: QuestionnaireConfigRepository = new InMemoryQuestionnaireConfigRepository();
 export const partnerCategoryVendorMappingRepository: PartnerCategoryVendorMappingRepository = new InMemoryPartnerCategoryVendorMappingRepository();
 export const skuPricingRepository: SkuPricingRepository = new InMemorySkuPricingRepository();
+export const depreciationConfigRepository: DepreciationConfigRepository = new InMemoryDepreciationConfigRepository();
+export const depreciationMatrixRepository: DepreciationMatrixRepository = new InMemoryDepreciationMatrixRepository();

@@ -435,6 +435,60 @@ export interface SkuPricing extends BaseEntity {
   uploadedById: number;
 }
 
+/**
+ * ---------------------------------------------------------------------
+ * Depreciation module (another input to the upcoming valuation/vendor-
+ * selection engine, alongside the vendor pricing module above)
+ * ---------------------------------------------------------------------
+ * Split into a header table (`depreciation_config`, one row per (category,
+ * brand, vendor?, validity window) "set") and a detail table
+ * (`depreciation_matrix`, one row per question-answer within that set) so
+ * uploading a full config batch - e.g. 40 questions x 8 brands = 320
+ * question-answer rows - doesn't repeat the same category/brand/vendor/
+ * validity columns 40 times over. This is the same normalization
+ * relationship as an order and its line items.
+ */
+
+/**
+ * Table: depreciation_config
+ * FKs: productCategoryId -> product_categories.id (required, exact match),
+ * brandId -> brands.id (required, exact match), vendorId -> partners.id
+ * (a vendor-type Partner row, nullable = applies to all vendors),
+ * uploadedById -> users.id.
+ *
+ * Uploading a new set for the exact same (productCategoryId, brandId,
+ * vendorId) triple doesn't create a conflicting duplicate - it versions
+ * the existing one: the currently-open row (`validTo` blank) has its
+ * `validTo` set to the new upload's timestamp, and a new row is inserted
+ * with `validFrom` = that same timestamp and `validTo` blank. History is
+ * preserved (old rows keep their now-closed validity window) rather than
+ * being overwritten. See `depreciationService.upload()`.
+ */
+export interface DepreciationConfig extends BaseEntity {
+  productCategoryId: number;
+  brandId: number;
+  vendorId: number | null;
+  validFrom: string;
+  /** Blank/undefined = open-ended - the currently-active set for this (category, brand, vendor) triple. */
+  validTo?: string;
+  uploadedById: number;
+}
+
+/**
+ * Table: depreciation_matrix
+ * One row per question-answer within a `depreciation_config` set - the
+ * actual deduction to apply when that answer was given.
+ * FKs: depreciationConfigId -> depreciation_config.id, questionAnswerId ->
+ * question_answer_mapping.id. `questionAnswerId` is unique per
+ * `depreciationConfigId` (one deduction per question-answer per set).
+ */
+export interface DepreciationMatrixEntry extends BaseEntity {
+  depreciationConfigId: number;
+  questionAnswerId: number;
+  depreciationType: 'percentage' | 'absolute';
+  depreciationValue: number;
+}
+
 export interface OtpChallenge {
   /**
    * Opaque, unguessable request handle handed to the client - deliberately

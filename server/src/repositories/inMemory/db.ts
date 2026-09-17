@@ -1,4 +1,5 @@
 import { products, skuAliases, skus } from '../../data/catalog.seed';
+import { depreciationConfigs, depreciationMatrix } from '../../data/depreciation.seed';
 import { partnerLocations, partners, roles } from '../../data/partner.seed';
 import {
   answerTranslations,
@@ -13,6 +14,8 @@ import { partnerCategoryVendorMappings, skuPricing } from '../../data/vendorPric
 import {
   AnswerTranslation,
   BuybackRequest,
+  DepreciationConfig,
+  DepreciationMatrixEntry,
   MasterAnswer,
   MasterQuestion,
   OtpChallenge,
@@ -71,6 +74,8 @@ export const tables = {
 
   partnerCategoryVendorMappings: new Map<number, PartnerCategoryVendorMapping>(partnerCategoryVendorMappings.map((m) => [m.id, m])),
   skuPricing: new Map<number, SkuPricing>(skuPricing.map((p) => [p.id, p])),
+  depreciationConfigs: new Map<number, DepreciationConfig>(depreciationConfigs.map((c) => [c.id, c])),
+  depreciationMatrix: new Map<number, DepreciationMatrixEntry>(depreciationMatrix.map((m) => [m.id, m])),
 
   masterQuestions: new Map<number, MasterQuestion>(masterQuestions.map((q) => [q.id, q])),
   questionTranslations: new Map<number, QuestionTranslation>(questionTranslations.map((t) => [t.id, t])),
@@ -114,6 +119,13 @@ export const indexes = {
   skuPricingBySkuId: new Map<number, Set<number>>() as Index<number>,
   // Composite index matching SkuPricingRepository.listForVendorSku(): `${vendorId}:${skuId}`
   skuPricingByVendorSku: new Map<string, Set<number>>() as Index<string>,
+
+  depreciationConfigsByCategory: new Map<number, Set<number>>() as Index<number>,
+  depreciationConfigsByBrand: new Map<number, Set<number>>() as Index<number>,
+  // Composite index matching DepreciationConfigRepository.findActive(): `${productCategoryId}:${brandId}:${vendorId ?? 'null'}`
+  depreciationConfigsByProfile: new Map<string, Set<number>>() as Index<string>,
+  depreciationMatrixByConfigId: new Map<number, Set<number>>() as Index<number>,
+  depreciationMatrixByQuestionAnswerId: new Map<number, Set<number>>() as Index<number>,
 };
 
 export function profileKey(categoryId: number, brandId: number | null, partnerId: number | null): string {
@@ -156,6 +168,15 @@ for (const sku of skus) {
 }
 for (const alias of skuAliases) {
   addToIndex(indexes.skuAliasesBySkuId, alias.skuId, alias.id);
+}
+for (const config of depreciationConfigs) {
+  addToIndex(indexes.depreciationConfigsByCategory, config.productCategoryId, config.id);
+  addToIndex(indexes.depreciationConfigsByBrand, config.brandId, config.id);
+  addToIndex(indexes.depreciationConfigsByProfile, profileKey(config.productCategoryId, config.brandId, config.vendorId), config.id);
+}
+for (const entry of depreciationMatrix) {
+  addToIndex(indexes.depreciationMatrixByConfigId, entry.depreciationConfigId, entry.id);
+  addToIndex(indexes.depreciationMatrixByQuestionAnswerId, entry.questionAnswerId, entry.id);
 }
 for (const mapping of partnerCategoryVendorMappings) {
   addToIndex(indexes.partnerCategoryVendorMappingsByPartnerId, mapping.partnerId, mapping.id);

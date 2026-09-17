@@ -20,6 +20,7 @@ src/
   data/catalog.seed.ts    Mock catalog + configurable questionnaire data
   data/user.seed.ts       Predefined, whitelisted staff/promoter accounts + role assignments
   data/vendorPricing.seed.ts  Partner->vendor mappings + per-vendor SKU pricing
+  data/depreciation.seed.ts   Depreciation config sets + their question-answer matrix
   repositories/           Data-access interfaces + in-memory implementation
     interfaces.ts          <- contracts a future MySQL implementation must satisfy
     inMemory/               <- current mock implementation (Maps in process memory)
@@ -267,6 +268,68 @@ route that calls it. If the promoter's partner has no vendor mapped for that cat
 no mapped vendor has priced that SKU yet, valuation now fails with a `422` rather than
 silently using a stale catalog price.
 
+## Depreciation module (another input to the upcoming valuation engine)
+
+Configurable deductions applied per condition-assessment answer, scoped to a (product
+category, brand, vendor?) combination - the third and last input the calculation engine
+needs, alongside the catalog and the vendor pricing module above.
+
+Split into two tables so uploading a full config batch doesn't repeat the same scoping
+columns on every row - exactly the same header/detail relationship as an order and its
+line items:
+
+| Table | Description | Foreign keys |
+| --- | --- | --- |
+| `depreciation_config` | The header/"set": one row per (category, brand, vendor?, validity window). `productCategoryId`/`brandId` are always required exact matches; `vendorId` is nullable (`null` = applies to all vendors) | `productCategoryId` → product_categories.id, `brandId` → brands.id, `vendorId` → partners.id (vendor, nullable), `uploadedById` → users.id |
+| `depreciation_matrix` | The detail/"line items": one lean row per question-answer deduction within a set - just the FK back to its set plus the deduction itself | `depreciationConfigId` → depreciation_config.id, `questionAnswerId` → question_answer_mapping.id |
+
+```
+product_categories ──┐
+brands ────────────────┼──▶ depreciation_config ──1:N──▶ depreciation_matrix ◀── question_answer_mapping
+partners (vendor, nullable) ┘                                  │
+users (uploadedById) ────────────────────────────────────────────┘
+```
+
+Why the split matters in practice: a flat single-table design would repeat
+category/brand/vendor/validity on every question-answer row - 8 brands × 40 questions =
+320 rows, each duplicating the same 5 scoping columns. Here that's **8
+`depreciation_config` rows** (one per brand/vendor/validity combination) and **320 lean
+`depreciation_matrix` rows** (just `depreciationConfigId` + `questionAnswerId` + type +
+value each) - changing a whole set's validity is a single update on its config row, not
+40.
+
+**Re-uploading versions the set, it never overwrites or duplicates it.** `POST
+/api/depreciation-config` (`depreciationService.upload()`) is the whole-batch entry
+point: given `{ productCategoryId, brandId, vendorId?, entries: [...] }`, if a config row
+is currently open (`validTo` blank) for that *exact* (category, brand, vendor) triple, its
+`validTo` is set to the new upload's timestamp, and a brand-new row is inserted starting
+at that same timestamp with `validTo` blank. History is preserved - old deductions stay
+queryable for whatever date range they were actually in effect, and the calculation
+engine (once built) always resolves whichever row's validity window covers the buyback's
+date.
+
+`questionAnswerId` is **unique per config set** - `upload()` rejects a batch containing
+the same `questionAnswerId` twice, and `POST /api/depreciation-matrix` (adding a single
+new deduction to an *existing* set without re-versioning it) rejects one that would
+duplicate an existing entry in that set. Per the module's scoping decisions: no uniqueness
+is enforced *across* config rows themselves (re-uploading the same triple is expected and
+handled by versioning above, not rejected), and how multiple matched deductions within a
+resolved set eventually combine (stack vs. most-specific-wins) is deliberately undecided
+until the calculation engine itself is built - `depreciationService.resolve()` only
+resolves *which single config set* applies (exact vendor match, falling back to the
+`vendorId: null` wildcard set), not how its matrix rows get combined.
+
+- `POST /api/depreciation-config` - upload/version a whole set (body above)
+- `PATCH /api/depreciation-config/:id` - lightweight edit (e.g. deactivate a set, or manually close its `validTo`) - not for editing individual deductions
+- `GET /api/depreciation-config/:id` - fetch a set's header
+- `GET /api/depreciation-config/:id/matrix` - fetch a set's full matrix of deductions
+- `POST /api/depreciation-config/search` - list/filter sets (body: `{ productCategoryId?, brandId?, vendorId?, isActive? }`)
+- `POST /api/depreciation-config/resolve` - calc-engine lookup: body `{ productCategoryId, brandId, vendorId?, asOf? }` → the applicable set + its full matrix, or `null`
+- `POST /api/depreciation-matrix` - add a single new deduction to an existing set (body: `{ depreciationConfigId, questionAnswerId, depreciationType, depreciationValue }`)
+- `PATCH /api/depreciation-matrix/:id` - correct/deactivate a single deduction
+- `GET /api/depreciation-matrix/:id` - fetch a single deduction
+- `POST /api/depreciation-matrix/search` - list/filter deductions (body: `{ depreciationConfigId?, questionAnswerId?, isActive? }`)
+
 ## Authentication, sessions & role-based access
 
 Login is **whitelist-only staff/promoter login**, not open customer self-signup - this app
@@ -407,8 +470,18 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `GET /api/sku-pricing/:id` | Fetch a price row |
 | `POST /api/sku-pricing/search` | List/filter price rows (body: `{ vendorId?, skuId?, isActive? }`) |
 | `POST /api/sku-pricing/resolve` | Calc-engine lookup: body `{ vendorId, skuId, asOf? }` → the price row valid at that instant, or `null` |
+| `POST /api/depreciation-config` | Upload/version a whole depreciation set (body: `{ productCategoryId, brandId, vendorId?, entries: [{ questionAnswerId, depreciationType, depreciationValue }], uploadedById? }`) |
+| `PATCH /api/depreciation-config/:id` | Lightweight edit of a set (deactivate, or manually close `validTo`) |
+| `GET /api/depreciation-config/:id` | Fetch a set's header |
+| `GET /api/depreciation-config/:id/matrix` | Fetch a set's full matrix of question-answer deductions |
+| `POST /api/depreciation-config/search` | List/filter sets (body: `{ productCategoryId?, brandId?, vendorId?, isActive? }`) |
+| `POST /api/depreciation-config/resolve` | Calc-engine lookup: body `{ productCategoryId, brandId, vendorId?, asOf? }` → the applicable set + matrix, or `null` |
+| `POST /api/depreciation-matrix` | Add a single new deduction to an existing set |
+| `PATCH /api/depreciation-matrix/:id` | Correct/deactivate a single deduction |
+| `GET /api/depreciation-matrix/:id` | Fetch a single deduction |
+| `POST /api/depreciation-matrix/search` | List/filter deductions (body: `{ depreciationConfigId?, questionAnswerId?, isActive? }`) |
 
-All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, `/api/questionnaire-config/*`, `/api/partner-category-vendor-mapping/*`, and `/api/sku-pricing/*` routes require `Authorization: Bearer <token>` from the OTP login flow. `/api/buyback/*` additionally requires the caller's role to grant the `process_buyback` right (see "Authentication, sessions & role-based access" above).
+All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, `/api/questionnaire-config/*`, `/api/partner-category-vendor-mapping/*`, `/api/sku-pricing/*`, `/api/depreciation-config/*`, and `/api/depreciation-matrix/*` routes require `Authorization: Bearer <token>` from the OTP login flow. `/api/buyback/*` additionally requires the caller's role to grant the `process_buyback` right (see "Authentication, sessions & role-based access" above).
 
 ### When does a buyback record actually get created?
 
