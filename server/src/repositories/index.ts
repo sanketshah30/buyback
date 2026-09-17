@@ -1,6 +1,8 @@
 import { env } from '../config/env';
 import { InMemoryAnswerTranslationRepository } from './inMemory/answerTranslation.repository';
 import { InMemoryBuybackRepository } from './inMemory/buyback.repository';
+import { InMemoryBuybackStatusHistoryRepository } from './inMemory/buybackStatusHistory.repository';
+import { InMemoryBuybackVendorCalculationLogRepository } from './inMemory/buybackVendorCalculationLog.repository';
 import { InMemoryCatalogRepository } from './inMemory/catalog.repository';
 import { InMemoryDepreciationConfigRepository } from './inMemory/depreciationConfig.repository';
 import { InMemoryDepreciationMatrixRepository } from './inMemory/depreciationMatrix.repository';
@@ -13,6 +15,7 @@ import { InMemoryPartnerLocationRepository } from './inMemory/partnerLocation.re
 import { InMemoryQuestionAnswerMappingRepository } from './inMemory/questionAnswerMapping.repository';
 import { InMemoryQuestionTranslationRepository } from './inMemory/questionTranslation.repository';
 import { InMemoryQuestionnaireConfigRepository } from './inMemory/questionnaireConfig.repository';
+import { InMemoryRequestStatusMasterRepository } from './inMemory/requestStatusMaster.repository';
 import { InMemoryRoleRepository } from './inMemory/role.repository';
 import { InMemorySessionRepository } from './inMemory/session.repository';
 import { InMemorySkuPricingRepository } from './inMemory/skuPricing.repository';
@@ -22,6 +25,8 @@ import { InMemoryUserRoleRepository } from './inMemory/userRole.repository';
 import {
   AnswerTranslationRepository,
   BuybackRepository,
+  BuybackStatusHistoryRepository,
+  BuybackVendorCalculationLogRepository,
   CatalogRepository,
   DepreciationConfigRepository,
   DepreciationMatrixRepository,
@@ -34,6 +39,7 @@ import {
   QuestionAnswerMappingRepository,
   QuestionTranslationRepository,
   QuestionnaireConfigRepository,
+  RequestStatusMasterRepository,
   RoleRepository,
   SessionRepository,
   SkuPricingRepository,
@@ -81,3 +87,6 @@ export const partnerCategoryVendorMappingRepository: PartnerCategoryVendorMappin
 export const skuPricingRepository: SkuPricingRepository = new InMemorySkuPricingRepository();
 export const depreciationConfigRepository: DepreciationConfigRepository = new InMemoryDepreciationConfigRepository();
 export const depreciationMatrixRepository: DepreciationMatrixRepository = new InMemoryDepreciationMatrixRepository();
+export const requestStatusMasterRepository: RequestStatusMasterRepository = new InMemoryRequestStatusMasterRepository();
+export const buybackStatusHistoryRepository: BuybackStatusHistoryRepository = new InMemoryBuybackStatusHistoryRepository();
+export const buybackVendorCalculationLogRepository: BuybackVendorCalculationLogRepository = new InMemoryBuybackVendorCalculationLogRepository();

@@ -128,7 +128,7 @@ export class InMemoryQuestionnaireConfigRepository implements QuestionnaireConfi
             getIndexed(indexes.answerTranslationsByAnswerId, answer.id, tables.answerTranslations),
             language,
           ) ?? answer.code;
-        answers.push({ answerId: answer.id, code: answer.code, text: answerText });
+        answers.push({ questionAnswerId: qaId, answerId: answer.id, code: answer.code, text: answerText });
       }
 
       results.push({ questionId, type: question.type, sequence, text: questionText, answers });

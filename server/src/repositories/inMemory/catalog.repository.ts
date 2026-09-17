@@ -1,5 +1,5 @@
-import { brands, categories, questionsByCategory } from '../../data/catalog.seed';
-import { Brand, Category, Product, Question, Sku, SkuAlias } from '../../types/domain';
+import { brands, categories } from '../../data/catalog.seed';
+import { Brand, Category, Product, Sku, SkuAlias } from '../../types/domain';
 import { CatalogRepository } from '../interfaces';
 import { tables, indexes } from './db';
 import { getIndexed } from './indexUtils';
@@ -46,9 +46,5 @@ export class InMemoryCatalogRepository implements CatalogRepository {
 
   async getSku(skuId: number): Promise<Sku | undefined> {
     return tables.skus.get(skuId);
-  }
-
-  async listQuestions(categoryId: number): Promise<Question[]> {
-    return questionsByCategory[categoryId] ?? [];
   }
 }

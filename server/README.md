@@ -21,6 +21,8 @@ src/
   data/user.seed.ts       Predefined, whitelisted staff/promoter accounts + role assignments
   data/vendorPricing.seed.ts  Partner->vendor mappings + per-vendor SKU pricing
   data/depreciation.seed.ts   Depreciation config sets + their question-answer matrix
+  data/requestStatus.seed.ts  The 12-row buyback status lifecycle master list
+  services/buybackEngine.service.ts  register()/calculate()/allocate() - see "Buyback request creation engine"
   repositories/           Data-access interfaces + in-memory implementation
     interfaces.ts          <- contracts a future MySQL implementation must satisfy
     inMemory/               <- current mock implementation (Maps in process memory)
@@ -164,10 +166,13 @@ only establishes the schema for that; wiring up actual authorization checks agai
 ## Questionnaire configuration module
 
 A config-driven engine for deciding which physical-assessment questions to show, based on
-the product category + brand + partner the app is currently working with. **This is
-additive/config-only for now** - it is not yet wired into the live buyback flow, which
-still uses the hardcoded `questionsByCategory` in `src/data/catalog.seed.ts`; that
-integration (and answer-to-valuation scoring) is a follow-up phase.
+the product category + brand + partner the app is currently working with. **This is now
+wired into the live buyback flow**: `POST /api/buyback/:id/assessment/questionnaire`
+(and the image/video AI-mock paths) resolve and validate against this module directly, and
+the answers a customer gives (`questionAnswerId`s) are exactly what the depreciation module
+and the calculation engine match against - see "Buyback request creation engine" below.
+There's no separate hardcoded per-category questionnaire anymore; this module *is* the
+questionnaire.
 
 ```
 questions ──1:N──▶ question_translations
@@ -244,30 +249,12 @@ convenience matching the calculation engine's expected lookup pattern:
 - `POST /api/partner-category-vendor-mapping/resolve` - body `{ partnerLocationId, productCategoryId }` → the active vendor `Partner` rows for that pair.
 - `POST /api/sku-pricing/resolve` - body `{ vendorId, skuId, asOf? }` → the single price row (or `null`) whose validity window covers `asOf` (defaults to now).
 
-**The live buyback flow already depends on this module** - `products.basePrice` and
-`skus.priceModifier` were removed once pricing moved here, so `POST
-/api/buyback/:id/valuation` now calls `resolveBestVendorPrice()`
-(`src/services/valuation.service.ts`) to get its base device price:
+**The live buyback flow depends on this module** - `products.basePrice` and
+`skus.priceModifier` were removed once pricing moved here; see "Buyback request creation
+engine" below for how `POST /api/buyback/:id/valuation` actually uses `sku_pricing` (and
+`depreciation_config`/`depreciation_matrix`) to compute a value per vendor.
 
-1. Look up the logged-in promoter's own `partnerLocationId` (same resolution as login -
-   see "Authentication, sessions & role-based access" below).
-2. Find every vendor mapped to that *location* + the buyback's category
-   (`partner_category_vendor_mapping`).
-3. For each such vendor, find its currently-valid price for the buyback's SKU
-   (`sku_pricing`, filtered by `validFrom`/`validTo`).
-4. **Placeholder vendor-selection algorithm**: take the highest currently-valid candidate
-   price (the best deal for the customer) and record which vendor won it on
-   `BuybackRequest.selectedVendorId`.
-
-Step 4 is intentionally simple - it exists only to keep the buyback flow functional now
-that the catalog has no price of its own. The real "calculate multiple buyback values,
-store them, and finalize a vendor based on our algorithm" engine is the next phase; when
-it ships, it should replace `resolveBestVendorPrice()` rather than needing to touch the
-route that calls it. If the promoter's location has no vendor mapped for that category, or
-no mapped vendor has priced that SKU yet, valuation now fails with a `422` rather than
-silently using a stale catalog price.
-
-## Depreciation module (another input to the upcoming valuation engine)
+## Depreciation module (another input to the valuation engine)
 
 Configurable deductions applied per condition-assessment answer, scoped to a (product
 category, brand, vendor?) combination - the third and last input the calculation engine
@@ -312,11 +299,10 @@ the same `questionAnswerId` twice, and `POST /api/depreciation-matrix` (adding a
 new deduction to an *existing* set without re-versioning it) rejects one that would
 duplicate an existing entry in that set. Per the module's scoping decisions: no uniqueness
 is enforced *across* config rows themselves (re-uploading the same triple is expected and
-handled by versioning above, not rejected), and how multiple matched deductions within a
-resolved set eventually combine (stack vs. most-specific-wins) is deliberately undecided
-until the calculation engine itself is built - `depreciationService.resolve()` only
-resolves *which single config set* applies (exact vendor match, falling back to the
-`vendorId: null` wildcard set), not how its matrix rows get combined.
+handled by versioning above, not rejected). `depreciationService.resolve()` only resolves
+*which single config set* applies (exact vendor match, falling back to the `vendorId: null`
+wildcard set) - the calculation engine below is what sums the matched matrix rows within
+that set into a single deduction amount.
 
 - `POST /api/depreciation-config` - upload/version a whole set (body above)
 - `PATCH /api/depreciation-config/:id` - lightweight edit (e.g. deactivate a set, or manually close its `validTo`) - not for editing individual deductions
@@ -328,6 +314,73 @@ resolves *which single config set* applies (exact vendor match, falling back to 
 - `PATCH /api/depreciation-matrix/:id` - correct/deactivate a single deduction
 - `GET /api/depreciation-matrix/:id` - fetch a single deduction
 - `POST /api/depreciation-matrix/search` - list/filter deductions (body: `{ depreciationConfigId?, questionAnswerId?, isActive? }`)
+
+## Buyback request creation engine (register / calculate / allocate)
+
+`POST /api/buyback/:id/valuation` runs this whole engine in one call (three internal
+phases, not three separate endpoints, since that's the live flow's single trigger point -
+`src/services/buybackEngine.service.ts`):
+
+1. **register** - generates `BuybackRequest.referenceId` (the `{{YYYYMMDD}}-{{Count}}`
+   reference), stamps `partnerLocationId` (the registering promoter's own location), and
+   sets `requestStatusId` to **"Request Created"**.
+2. **calculate** - for every vendor mapped to that location + the buyback's category
+   (`partner_category_vendor_mapping`), computes a candidate buyback value:
+
+   ```
+   buybackValue = skuPrice - totalDepreciationAmount
+   ```
+
+   `skuPrice` is that vendor's current `sku_pricing` price for the buyback's SKU (vendors
+   with no valid price for this SKU aren't viable candidates and are skipped).
+   `totalDepreciationAmount` sums every `depreciation_matrix` deduction whose
+   `questionAnswerId` was actually answered on this request, resolved via
+   `depreciationService.resolve()` for that vendor + the buyback's category/brand
+   (vendor-exact falling back to the wildcard set): **percentage-type entries convert to
+   an amount off `skuPrice`** (`skuPrice * value / 100`), **absolute-type entries are
+   taken directly**, and both kinds sum together - one buyback can mix percentage and
+   absolute deductions across different question-answers. Every evaluated vendor is
+   logged to `buyback_vendor_calculation_log` (not just the winner), so the eventual
+   allocation stays fully auditable - see `GET /api/buyback/:id/vendor-calculations`.
+3. **allocate** - picks the candidate with the highest `buybackValue` (ties broken by the
+   lowest `vendorId`) and writes it onto the parent `BuybackRequest`
+   (`maxValue`, `allocatedVendorId`), advancing `requestStatusId` to **"Amount
+   Calculated"**.
+
+If no vendor is mapped to the promoter's location for that category, or none of the
+mapped vendors has priced the SKU, the whole call fails with a `422` rather than silently
+allocating a zero/wrong value.
+
+```
+buyback_requests ──1:N──▶ buyback_vendor_calculation_log ──▶ partners (vendor)
+        │                          │        │
+        │                   sku_pricing  depreciation_config (nullable)
+        │
+        └──1:N──▶ buyback_status_history ──▶ request_status_master
+```
+
+| Table | Description | Foreign keys |
+| --- | --- | --- |
+| `request_status_master` | The full formal buyback lifecycle (12 rows, in `sequence` order) - only "Request Created" and "Amount Calculated" are wired into the live flow so far; the rest (diagnosis, logistics, payout) are seeded for upcoming phases | - |
+| `buyback_status_history` | Append-only log of every `requestStatusId` transition a request goes through | `buybackRequestId` → buyback_requests.id, `requestStatusId` → request_status_master.id, `changedByUserId` → users.id |
+| `buyback_vendor_calculation_log` | One row per (buyback request, evaluated vendor) from the calculate phase - `skuPrice`, `totalDepreciationAmount`, and the final `buybackValue` are all stored, not just the final number, for full auditability | `buybackRequestId` → buyback_requests.id, `vendorId` → partners.id, `skuPricingId` → sku_pricing.id, `depreciationConfigId` → depreciation_config.id (nullable - a vendor may have no depreciation set configured at all, treated as zero deduction) |
+
+`BuybackRequest` itself gained `requestStatusId` (nullable - unset while the request is
+still a local, unsaved draft; only ever one of `request_status_master`'s 12 values once
+registered), `partnerLocationId`, and `allocatedVendorId` (renamed from the earlier
+placeholder's `selectedVendorId`). Its original `status` string field is untouched and
+keeps tracking the live wizard's granular UI-flow steps (`draft`, `device_captured`, ...,
+`confirmed`) - `requestStatusId` is a separate, additive, more formal lifecycle status,
+per an explicit scoping decision to keep the two independent for now.
+
+**The questionnaire assessment step is now backed entirely by the normalized
+questionnaire-config module** (no more hardcoded per-category question/answer codes):
+`POST /api/buyback/:id/assessment/questionnaire` resolves the applicable questionnaire via
+`questionnaire-config/resolve()` (category + brand + the promoter's own retail partner)
+and validates the client's answers against it, and the image/video AI-mock assessment
+paths (`assessment.service.ts`) do the same, so all three assessment methods produce
+answers in the same `{ questionId, questionAnswerIds }` shape - which is exactly what lets
+the calculate phase match a customer's answers against `depreciation_matrix`.
 
 ## Authentication, sessions & role-based access
 
@@ -398,7 +451,6 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `POST /api/catalog/products` | List products for a category+brand (body: `{ categoryId, brandId }`) |
 | `POST /api/catalog/skus` | List SKUs for a product (body: `{ productId }`) |
 | `POST /api/catalog/sku-aliases` | List partner SKU aliases for a SKU (body: `{ skuId }`) |
-| `POST /api/catalog/questions` | Configurable questionnaire for a category (body: `{ categoryId }`) |
 | `GET /api/buyback` | List the authenticated user's buyback history |
 | `POST /api/buyback` | Start a new buyback draft (category + brand) |
 | `GET /api/buyback/:id` | Fetch a buyback request |
@@ -407,7 +459,9 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `POST /api/buyback/:id/assessment/questionnaire` | Submit questionnaire answers (server re-validates every question is answered with a valid option) |
 | `POST /api/buyback/:id/assessment/images` | Upload 6-side images -> AI-mapped answers |
 | `POST /api/buyback/:id/assessment/video` | Upload a video -> AI-mapped answers |
-| `POST /api/buyback/:id/valuation` | Compute max value + generate `{{YYYYMMDD}}-{{Count}}` buyback ID |
+| `POST /api/buyback/:id/valuation` | Runs the full register → calculate → allocate engine (see below) and returns the updated request |
+| `GET /api/buyback/:id/vendor-calculations` | Every vendor candidate the calculate phase evaluated, for auditing the allocation decision |
+| `GET /api/buyback/:id/status-history` | Every `requestStatusId` transition this request has gone through |
 | `POST /api/buyback/:id/diagnosis/initiate` | Start the optional QR-based diagnosis |
 | `GET /api/buyback/:id/diagnosis/status` | Poll diagnosis progress/result |
 | `POST /api/buyback/:id/finalize-value` | Apply the no-diagnosis value drop |

@@ -44,25 +44,21 @@ export interface SkuAlias extends BaseEntity {
 
 export type QuestionType = 'single-choice' | 'multi-choice';
 
-export interface QuestionOption {
-  id: string;
-  label: string;
-  valueImpactPercent: number;
-}
-
-export interface Question {
-  id: string;
-  categoryId: number;
-  text: string;
+/** The resolved, per-(category, brand, partner) questionnaire - see POST /api/questionnaire-config/resolve. */
+export interface ResolvedQuestionnaireQuestion {
+  questionId: number;
   type: QuestionType;
-  options: QuestionOption[];
+  sequence: number;
+  text: string;
+  answers: { questionAnswerId: number; answerId: number; code: string; text: string }[];
 }
 
 export type AssessmentMethod = 'questionnaire' | 'image' | 'video';
 
+/** `questionAnswerIds` reference `ResolvedQuestionnaireQuestion.answers[].questionAnswerId`. */
 export interface QuestionnaireAnswer {
-  questionId: string;
-  optionIds: string[];
+  questionId: number;
+  questionAnswerIds: number[];
 }
 
 export type BuybackStatus =
@@ -112,6 +108,8 @@ export interface BuybackRequest {
   referenceId?: string;
   userId: number;
   status: BuybackStatus;
+  requestStatusId?: number;
+  partnerLocationId?: number;
   category?: Category;
   brand?: Brand;
   product?: Product;
@@ -123,7 +121,7 @@ export interface BuybackRequest {
   assessmentImageUrls?: string[];
   assessmentVideoUrl?: string;
   maxValue?: number;
-  selectedVendorId?: number;
+  allocatedVendorId?: number;
   withDiagnosis?: boolean;
   diagnosis?: DiagnosisState;
   finalValue?: number;

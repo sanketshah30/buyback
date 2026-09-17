@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Brand, Category, Product, Question, Sku, SkuAlias } from '../types/api';
+import type { Brand, Category, Product, Sku, SkuAlias } from '../types/api';
 
 // All catalog lookups are POST + JSON body, never GET + query string, so
 // filter values never end up in URLs/server logs/browser history. These are
@@ -11,5 +11,4 @@ export const catalogApi = {
     api.post<Product[]>('/api/catalog/products', { categoryId, brandId }),
   listSkus: (productId: number) => api.post<Sku[]>('/api/catalog/skus', { productId }),
   listSkuAliases: (skuId: number) => api.post<SkuAlias[]>('/api/catalog/sku-aliases', { skuId }),
-  listQuestions: (categoryId: number) => api.post<Question[]>('/api/catalog/questions', { categoryId }),
 };

@@ -1,15 +1,16 @@
 import { NextFunction, Response, Router } from 'express';
-import { catalogRepository, buybackRepository, partnerLocationRepository, userRepository } from '../repositories';
+import { catalogRepository, buybackRepository, buybackStatusHistoryRepository, buybackVendorCalculationLogRepository, partnerLocationRepository, questionnaireConfigRepository, userRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { requireRight } from '../middleware/rights.middleware';
 import { toPublicUrl, upload } from '../middleware/upload.middleware';
+import { ResolvedQuestionnaireQuestion } from '../repositories/interfaces';
 import { assessmentService } from '../services/assessment.service';
 import { authService } from '../services/auth.service';
+import * as buybackEngine from '../services/buybackEngine.service';
 import { diagnosisService } from '../services/diagnosis.service';
 import { notificationService } from '../services/notification.service';
-import { applyDiagnosisAdjustment, applyNoDiagnosisDrop, computeMaxValue, resolveBestVendorPrice } from '../services/valuation.service';
-import { BuybackRequest, QuestionnaireAnswer } from '../types/domain';
-import { dateKey, formatBuybackReferenceId } from '../utils/id';
+import { applyDiagnosisAdjustment, applyNoDiagnosisDrop } from '../services/valuation.service';
+import { BuybackRequest, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
 import { nextId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
@@ -48,6 +49,24 @@ async function requireOwnedBuybackForUpload(req: AuthedRequest, _res: Response, 
   } catch (err) {
     next(err);
   }
+}
+
+/** Every promoter/staff user acts on behalf of their own current partner location - see "Authentication, sessions & role-based access" in server/README.md. */
+async function resolvePromoterLocation(userId: number): Promise<PartnerLocation> {
+  const promoter = await userRepository.findById(userId);
+  const location = promoter?.partnerLocationId !== undefined ? await partnerLocationRepository.findById(promoter.partnerLocationId) : undefined;
+  if (!location) {
+    throw Object.assign(new Error('Your account is not assigned to a partner location.'), { status: 422 });
+  }
+  return location;
+}
+
+/** The category/brand/(promoter's retail partner)-scoped questionnaire - see "Questionnaire configuration module" in server/README.md. */
+async function resolveQuestionnaireFor(request: BuybackRequest, location: PartnerLocation): Promise<ResolvedQuestionnaireQuestion[]> {
+  if (!request.category || !request.brand) {
+    throw Object.assign(new Error('Select a category and brand first'), { status: 400 });
+  }
+  return questionnaireConfigRepository.resolve(request.category.id, request.brand.id, location.partnerId, 'en');
 }
 
 buybackRouter.get('/', async (req: AuthedRequest, res, next) => {
@@ -161,27 +180,27 @@ buybackRouter.patch('/:id/product', async (req: AuthedRequest, res, next) => {
 buybackRouter.post('/:id/assessment/questionnaire', async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-    if (!request.category) return res.status(400).json({ error: 'Select a category first' });
+    const location = await resolvePromoterLocation(req.auth!.userId);
     const { answers } = req.body as { answers?: QuestionnaireAnswer[] };
     if (!answers?.length) return res.status(400).json({ error: 'answers are required' });
 
     // Trust nothing from the client about completeness - re-derive it from the
-    // category's actual configured questionnaire, otherwise a client could
-    // submit only the bonus "accessories" answer and skip every damage
+    // category+brand+partner's actual resolved questionnaire, otherwise a
+    // client could submit only a bonus answer and skip every damage
     // question to inflate the valuation.
-    const questions = await catalogRepository.listQuestions(request.category.id);
+    const questions = await resolveQuestionnaireFor(request, location);
     const answersByQuestion = new Map(answers.map((a) => [a.questionId, a]));
     for (const question of questions) {
-      const answer = answersByQuestion.get(question.id);
-      if (!answer || answer.optionIds.length === 0) {
-        return res.status(400).json({ error: `Missing answer for question "${question.id}"` });
+      const answer = answersByQuestion.get(question.questionId);
+      if (!answer || answer.questionAnswerIds.length === 0) {
+        return res.status(400).json({ error: `Missing answer for question "${question.text}"` });
       }
-      const validOptionIds = new Set(question.options.map((o) => o.id));
-      if (!answer.optionIds.every((optionId) => validOptionIds.has(optionId))) {
-        return res.status(400).json({ error: `Invalid option selected for question "${question.id}"` });
+      const validQuestionAnswerIds = new Set(question.answers.map((a) => a.questionAnswerId));
+      if (!answer.questionAnswerIds.every((qaId) => validQuestionAnswerIds.has(qaId))) {
+        return res.status(400).json({ error: `Invalid answer selected for question "${question.text}"` });
       }
-      if (question.type === 'single-choice' && answer.optionIds.length !== 1) {
-        return res.status(400).json({ error: `Question "${question.id}" accepts exactly one option` });
+      if (question.type === 'single-choice' && answer.questionAnswerIds.length !== 1) {
+        return res.status(400).json({ error: `Question "${question.text}" accepts exactly one answer` });
       }
     }
 
@@ -203,14 +222,14 @@ buybackRouter.post(
   async (req: AuthedRequest, res, next) => {
     try {
       const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-      if (!request.category) return res.status(400).json({ error: 'Select a category first' });
+      const location = await resolvePromoterLocation(req.auth!.userId);
 
       const files = (req.files as Express.Multer.File[]) ?? [];
       if (files.length < 1) {
         return res.status(400).json({ error: 'At least one image is required (6 recommended: front, back, top, bottom, left, right)' });
       }
 
-      const questions = await catalogRepository.listQuestions(request.category.id);
+      const questions = await resolveQuestionnaireFor(request, location);
       const aiAssessment = assessmentService.runImageAssessment(questions, files.length);
 
       const updated = await buybackRepository.update(request.id, {
@@ -234,10 +253,10 @@ buybackRouter.post(
   async (req: AuthedRequest, res, next) => {
     try {
       const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-      if (!request.category) return res.status(400).json({ error: 'Select a category first' });
+      const location = await resolvePromoterLocation(req.auth!.userId);
       if (!req.file) return res.status(400).json({ error: 'A video file is required' });
 
-      const questions = await catalogRepository.listQuestions(request.category.id);
+      const questions = await resolveQuestionnaireFor(request, location);
       const aiAssessment = assessmentService.runVideoAssessment(questions);
 
       const updated = await buybackRepository.update(request.id, {
@@ -254,45 +273,55 @@ buybackRouter.post(
   },
 );
 
+/**
+ * Runs the full buyback request creation engine in sequence - see
+ * "Buyback request creation engine (register / calculate / allocate)" in
+ * server/README.md:
+ *   1. register  - generate referenceId, stamp partnerLocationId, status "Request Created"
+ *   2. calculate - log every eligible vendor's candidate buyback value
+ *   3. allocate  - pick the highest, write it onto the parent request, status "Amount Calculated"
+ */
 buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
   try {
-    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-    if (!request.product || !request.sku || !request.category) {
+    let request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    if (!request.product || !request.sku || !request.category || !request.brand) {
       return res.status(400).json({ error: 'Product details must be selected before valuation' });
     }
-    if (!request.questionnaireAnswers?.length) {
+    const answers = request.questionnaireAnswers;
+    if (!answers?.length) {
       return res.status(400).json({ error: 'Physical assessment must be completed before valuation' });
     }
 
-    // The catalog carries no price at all anymore - resolve it from the
-    // vendor pricing module instead, using the logged-in promoter's own
-    // retail partner (see "Vendor pricing module" in server/README.md).
-    const promoter = await userRepository.findById(req.auth!.userId);
-    const partnerLocation = promoter?.partnerLocationId !== undefined
-      ? await partnerLocationRepository.findById(promoter.partnerLocationId)
-      : undefined;
-    if (!partnerLocation) {
-      return res.status(422).json({ error: 'Your account is not assigned to a partner location, so no vendor pricing is configured for you.' });
-    }
+    const location = await resolvePromoterLocation(req.auth!.userId);
+    const userId = req.auth!.userId;
 
-    const vendorPrice = await resolveBestVendorPrice(partnerLocation.id, request.category.id, request.sku.id);
-    if (!vendorPrice) {
-      return res.status(422).json({ error: 'No vendor has an active price configured for this SKU yet.' });
-    }
+    request = await buybackEngine.register(request, location.id, userId);
+    const candidates = await buybackEngine.calculate(request, location.id, answers, new Date());
+    const allocated = await buybackEngine.allocate(request, candidates, userId);
 
-    const questions = await catalogRepository.listQuestions(request.category.id);
-    const maxValue = computeMaxValue(vendorPrice.price, questions, request.questionnaireAnswers);
+    return res.json(allocated);
+  } catch (err) {
+    return next(err);
+  }
+});
 
-    const sequence = await buybackRepository.nextDailySequence(dateKey());
-    const referenceId = formatBuybackReferenceId(sequence);
+/** Every vendor candidate evaluated during the calculate phase, for auditing the allocation decision - see BuybackVendorCalculationLog in types/domain.ts. */
+buybackRouter.get('/:id/vendor-calculations', async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    const logs = await buybackVendorCalculationLogRepository.listByBuybackRequest(request.id);
+    return res.json(logs);
+  } catch (err) {
+    return next(err);
+  }
+});
 
-    const updated = await buybackRepository.update(request.id, {
-      referenceId,
-      maxValue,
-      selectedVendorId: vendorPrice.vendorId,
-      status: 'valuation_ready',
-    });
-    return res.json(updated);
+/** Every requestStatusId transition this request has gone through - see BuybackStatusHistory in types/domain.ts. */
+buybackRouter.get('/:id/status-history', async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    const history = await buybackStatusHistoryRepository.listByBuybackRequest(request.id);
+    return res.json(history);
   } catch (err) {
     return next(err);
   }

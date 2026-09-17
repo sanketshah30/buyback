@@ -80,35 +80,21 @@ export interface SkuAlias extends BaseEntity {
 
 export type QuestionType = 'single-choice' | 'multi-choice';
 
-export interface QuestionOption {
-  id: string;
-  label: string;
-  /** Percentage deduction applied to the running value when this option is chosen (0-100). Negative = bonus. */
-  valueImpactPercent: number;
-}
-
-/**
- * The buyback flow's current hardcoded, per-category questionnaire (see
- * `src/data/catalog.seed.ts`). This is inline configuration embedded
- * directly in a buyback record, not a normalized relational table, so -
- * unlike every table above/below - its `id`/`categoryId`/option `id`s stay
- * as semantic string codes (e.g. "yes", "none") rather than integers; they
- * are being superseded by the `MasterQuestion`/`QuestionnaireConfig` module
- * further down once that's wired into the live flow.
- */
-export interface Question {
-  id: string;
-  categoryId: number;
-  text: string;
-  type: QuestionType;
-  options: QuestionOption[];
-}
-
 export type AssessmentMethod = 'questionnaire' | 'image' | 'video';
 
+/**
+ * One answered question, in the live buyback flow's assessment step.
+ * `questionId`/`questionAnswerIds` reference the normalized questionnaire
+ * module (`MasterQuestion.id` / `QuestionAnswerMapping.id`) - the live flow
+ * used to have its own hardcoded, string-keyed per-category questionnaire,
+ * now replaced by resolving `POST /api/questionnaire-config/resolve` and
+ * submitting back real `questionAnswerId`s, which is what lets the
+ * depreciation module (`depreciation_matrix.questionAnswerId`) actually
+ * match against a customer's answers.
+ */
 export interface QuestionnaireAnswer {
-  questionId: string;
-  optionIds: string[];
+  questionId: number;
+  questionAnswerIds: number[];
 }
 
 export type BuybackStatus =
@@ -153,13 +139,29 @@ export interface CustomerInfo {
   mobile: string;
 }
 
-/** Table: buyback_requests. FK: userId -> users.id (indexed - history is always looked up per user). */
+/**
+ * Table: buyback_requests. FK: userId -> users.id (indexed - history is
+ * always looked up per user).
+ *
+ * `status` (the original string enum) keeps tracking the live wizard's
+ * granular UI-flow steps (draft, device_captured, ..., confirmed) - it
+ * isn't replaced. `requestStatusId` is a separate, additive field: the
+ * formal business-lifecycle status from `request_status_master`, only
+ * ever set to one of that table's 12 rows, starting with "Request
+ * Created" at registration and "Amount Calculated" once allocation
+ * finishes (see `buybackEngine.service.ts`) - later phases will wire the
+ * rest of the master list (diagnosis, logistics, payout) into it.
+ */
 export interface BuybackRequest {
   id: number;
-  /** Human-facing {{YYYYMMDD}}-{{Count}} reference (e.g. "20260917-1") - generated at valuation time, distinct from the internal integer `id`. */
+  /** Human-facing {{YYYYMMDD}}-{{Count}} reference (e.g. "20260917-1") - generated at registration, distinct from the internal integer `id`. */
   referenceId?: string;
   userId: number;
   status: BuybackStatus;
+  /** FK: request_status_master.id - set at registration ("Request Created") onward; undefined before that (still being locally drafted). */
+  requestStatusId?: number;
+  /** The registering promoter's own location at the time of registration - FK: partner_locations.id. */
+  partnerLocationId?: number;
   category?: Category;
   brand?: Brand;
   product?: Product;
@@ -173,9 +175,10 @@ export interface BuybackRequest {
   aiAssessment?: AiAssessmentResult;
   assessmentImageUrls?: string[];
   assessmentVideoUrl?: string;
+  /** The allocated vendor's buyback value, set by the allocate phase - see buybackEngine.service.ts. */
   maxValue?: number;
-  /** Which vendor's price (from `sku_pricing`) was used for `maxValue` - see `resolveBestVendorPrice()` in valuation.service.ts. FK: partners.id. */
-  selectedVendorId?: number;
+  /** The vendor allocated the device, per the highest computed buyback value - see buybackEngine.service.ts. FK: partners.id. */
+  allocatedVendorId?: number;
   withDiagnosis?: boolean;
   diagnosis?: DiagnosisState;
   finalValue?: number;
@@ -491,6 +494,76 @@ export interface DepreciationMatrixEntry extends BaseEntity {
   questionAnswerId: number;
   depreciationType: 'percentage' | 'absolute';
   depreciationValue: number;
+}
+
+/**
+ * ---------------------------------------------------------------------
+ * Buyback request creation engine (register / calculate / allocate)
+ * ---------------------------------------------------------------------
+ * Three tables supporting the three phases of turning a captured device
+ * assessment into an allocated buyback value:
+ *   1. register - generates `BuybackRequest.referenceId`, stamps
+ *      `partnerLocationId`, and sets `requestStatusId` to "Request Created".
+ *   2. calculate - for every vendor mapped to that (partnerLocationId,
+ *      category) via `partner_category_vendor_mapping`, computes a
+ *      candidate buyback value (`sku_pricing` price minus the matched
+ *      `depreciation_matrix` deductions) and logs every candidate in
+ *      `buyback_vendor_calculation_log`.
+ *   3. allocate - picks the candidate with the highest `buybackValue`
+ *      (ties broken by lowest `vendorId`), writes it back onto the parent
+ *      `BuybackRequest` (`maxValue`, `allocatedVendorId`), and advances
+ *      `requestStatusId` to "Amount Calculated".
+ * See `buybackEngine.service.ts` for the implementation.
+ */
+
+/**
+ * Table: request_status_master
+ * The full formal buyback lifecycle, in order (`sequence`). Only
+ * "Request Created" and "Amount Calculated" are wired into the live flow
+ * so far (registration/allocation) - the rest of the list exists for the
+ * upcoming diagnosis/logistics/payout phases.
+ */
+export interface RequestStatusMaster extends BaseEntity {
+  name: string;
+  sequence: number;
+}
+
+/**
+ * Table: buyback_status_history
+ * Append-only log of every `requestStatusId` transition a buyback request
+ * goes through - never mutated, only appended to.
+ * FKs: buybackRequestId -> buyback_requests.id (indexed), requestStatusId
+ * -> request_status_master.id, changedByUserId -> users.id.
+ */
+export interface BuybackStatusHistory extends BaseEntity {
+  buybackRequestId: number;
+  requestStatusId: number;
+  changedByUserId?: number;
+}
+
+/**
+ * Table: buyback_vendor_calculation_log
+ * One row per (buyback request, evaluated vendor) produced by the
+ * calculate phase - every candidate is recorded, not just the winner, so
+ * the allocation decision (and the numbers behind it) stays fully
+ * auditable. `depreciationConfigId` is nullable since a vendor may have no
+ * depreciation set configured for this category/brand at all, in which
+ * case its deduction is treated as zero.
+ * FKs: buybackRequestId -> buyback_requests.id (indexed), vendorId ->
+ * partners.id, skuPricingId -> sku_pricing.id, depreciationConfigId ->
+ * depreciation_config.id (nullable).
+ */
+export interface BuybackVendorCalculationLog extends BaseEntity {
+  buybackRequestId: number;
+  vendorId: number;
+  skuPricingId: number;
+  depreciationConfigId: number | null;
+  /** The vendor's raw sku_pricing price, before any depreciation. */
+  skuPrice: number;
+  /** Sum of every matched depreciation_matrix deduction (percentage entries converted to an amount off skuPrice, absolute entries taken directly). */
+  totalDepreciationAmount: number;
+  /** max(0, skuPrice - totalDepreciationAmount) - this vendor's candidate buyback value. */
+  buybackValue: number;
 }
 
 export interface OtpChallenge {

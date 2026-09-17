@@ -65,13 +65,3 @@ catalogRouter.post('/sku-aliases', async (req, res, next) => {
     return next(err);
   }
 });
-
-catalogRouter.post('/questions', async (req, res, next) => {
-  try {
-    const categoryId = parseId(req.body?.categoryId);
-    if (!categoryId) return res.status(400).json({ error: 'categoryId is required' });
-    return res.json(await catalogRepository.listQuestions(categoryId));
-  } catch (err) {
-    return next(err);
-  }
-});

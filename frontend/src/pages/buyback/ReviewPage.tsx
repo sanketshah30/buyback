@@ -7,22 +7,25 @@ import { ProgressSteps } from '../../components/ui/ProgressSteps';
 import { Spinner } from '../../components/ui/Spinner';
 import { useBuyback } from '../../hooks/useBuyback';
 import { ApiError } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { buybackApi } from '../../lib/buybackApi';
-import { catalogApi } from '../../lib/catalogApi';
-import type { Question } from '../../types/api';
+import { questionnaireConfigApi } from '../../lib/questionnaireConfigApi';
+import type { ResolvedQuestionnaireQuestion } from '../../types/api';
 
 export function ReviewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { partnerId } = useAuth();
   const { data, loading } = useBuyback(id);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<ResolvedQuestionnaireQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!data?.category) return;
-    catalogApi.listQuestions(data.category.id).then(setQuestions);
-  }, [data?.category]);
+    if (!data?.category || !data?.brand) return;
+    questionnaireConfigApi.resolve(data.category.id, data.brand.id, partnerId ?? undefined).then((res) => setQuestions(res.questions));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.category, data?.brand]);
 
   if (loading) return <PageShell title="Review"><Spinner /></PageShell>;
   if (!data) return <PageShell title="Review"><Banner tone="error">Buyback request not found.</Banner></PageShell>;
@@ -85,14 +88,14 @@ export function ReviewPage() {
         {data.aiAssessment && <Banner tone="info">{data.aiAssessment.summary}</Banner>}
         <div className="summary-list">
           {data.questionnaireAnswers?.map((answer) => {
-            const question = questions.find((q) => q.id === answer.questionId);
-            const labels = answer.optionIds
-              .map((optId) => question?.options.find((o) => o.id === optId)?.label)
+            const question = questions.find((q) => q.questionId === answer.questionId);
+            const labels = answer.questionAnswerIds
+              .map((qaId) => question?.answers.find((a) => a.questionAnswerId === qaId)?.text)
               .filter(Boolean)
               .join(', ');
             return (
               <div className="summary-row" key={answer.questionId}>
-                <span className="summary-row__label">{question?.text ?? answer.questionId}</span>
+                <span className="summary-row__label">{question?.text ?? `Question ${answer.questionId}`}</span>
                 <span className="summary-row__value">{labels}</span>
               </div>
             );

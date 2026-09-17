@@ -9,11 +9,14 @@ import {
   questionTranslations,
   questionnaireConfigs,
 } from '../../data/questionnaireConfig.seed';
+import { requestStatuses } from '../../data/requestStatus.seed';
 import { users, userRoles as seededUserRoles } from '../../data/user.seed';
 import { partnerCategoryVendorMappings, skuPricing } from '../../data/vendorPricing.seed';
 import {
   AnswerTranslation,
   BuybackRequest,
+  BuybackStatusHistory,
+  BuybackVendorCalculationLog,
   DepreciationConfig,
   DepreciationMatrixEntry,
   MasterAnswer,
@@ -25,6 +28,7 @@ import {
   QuestionAnswerMapping,
   QuestionTranslation,
   QuestionnaireConfig,
+  RequestStatusMaster,
   Role,
   PartnerCategoryVendorMapping,
   Session,
@@ -83,6 +87,10 @@ export const tables = {
   answerTranslations: new Map<number, AnswerTranslation>(answerTranslations.map((t) => [t.id, t])),
   questionAnswerMappings: new Map<number, QuestionAnswerMapping>(questionAnswerMappings.map((m) => [m.id, m])),
   questionnaireConfigs: new Map<number, QuestionnaireConfig>(questionnaireConfigs.map((c) => [c.id, c])),
+
+  requestStatusMaster: new Map<number, RequestStatusMaster>(requestStatuses.map((s) => [s.id, s])),
+  buybackStatusHistory: new Map<number, BuybackStatusHistory>(),
+  buybackVendorCalculationLog: new Map<number, BuybackVendorCalculationLog>(),
 };
 
 /** Secondary indexes - see the module doc comment above. */
@@ -126,6 +134,9 @@ export const indexes = {
   depreciationConfigsByProfile: new Map<string, Set<number>>() as Index<string>,
   depreciationMatrixByConfigId: new Map<number, Set<number>>() as Index<number>,
   depreciationMatrixByQuestionAnswerId: new Map<number, Set<number>>() as Index<number>,
+
+  buybackStatusHistoryByBuybackRequestId: new Map<number, Set<number>>() as Index<number>,
+  buybackVendorCalculationLogByBuybackRequestId: new Map<number, Set<number>>() as Index<number>,
 };
 
 export function profileKey(categoryId: number, brandId: number | null, partnerId: number | null): string {

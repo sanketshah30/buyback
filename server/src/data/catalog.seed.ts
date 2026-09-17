@@ -1,4 +1,4 @@
-import { Brand, Category, Product, Question, Sku, SkuAlias } from '../types/domain';
+import { Brand, Category, Product, Sku, SkuAlias } from '../types/domain';
 import { reserveIdRange } from '../utils/idGenerator';
 
 // Fixed timestamp for deterministic mock seed data - a real DB would use actual
@@ -118,68 +118,3 @@ reserveIdRange('products', products.length);
 reserveIdRange('skus', skus.length);
 reserveIdRange('sku_aliases', skuAliases.length);
 
-const yesNoOptions = (yesImpact: number, noImpact: number) => [
-  { id: 'yes', label: 'Yes', valueImpactPercent: yesImpact },
-  { id: 'no', label: 'No', valueImpactPercent: noImpact },
-];
-
-/**
- * Questionnaire is configurable per category, as required by the product spec.
- * `valueImpactPercent` is a percentage deducted (positive) or added (negative)
- * from the running device value when an option is selected.
- */
-export const questionsByCategory: Record<number, Question[]> = {
-  [CATEGORY_SMARTPHONE_ID]: [
-    {
-      id: 'q-powers-on',
-      categoryId: CATEGORY_SMARTPHONE_ID,
-      text: 'Is the device powering on?',
-      type: 'single-choice',
-      options: yesNoOptions(0, 70),
-    },
-    {
-      id: 'q-screen-damage',
-      categoryId: CATEGORY_SMARTPHONE_ID,
-      text: 'Are there any scratches/dents/discoloration on the screen?',
-      type: 'single-choice',
-      options: yesNoOptions(15, 0),
-    },
-    {
-      id: 'q-body-damage',
-      categoryId: CATEGORY_SMARTPHONE_ID,
-      text: 'Are there any damages/dents on the body?',
-      type: 'single-choice',
-      options: yesNoOptions(10, 0),
-    },
-    {
-      id: 'q-accessories',
-      categoryId: CATEGORY_SMARTPHONE_ID,
-      text: 'What accessories are available?',
-      type: 'multi-choice',
-      options: [
-        { id: 'charger', label: 'Charger', valueImpactPercent: -2 },
-        { id: 'box', label: 'Box', valueImpactPercent: -2 },
-        { id: 'headphone', label: 'Headphone', valueImpactPercent: -1 },
-        { id: 'none', label: 'None of these', valueImpactPercent: 0 },
-      ],
-    },
-  ],
-};
-
-// Non-smartphone categories reuse the same generic questionnaire shape for this MVP.
-questionsByCategory[CATEGORY_TABLET_ID] = questionsByCategory[CATEGORY_SMARTPHONE_ID].map((q) => ({
-  ...q,
-  id: `${q.id}-tablet`,
-  categoryId: CATEGORY_TABLET_ID,
-}));
-questionsByCategory[CATEGORY_LAPTOP_ID] = questionsByCategory[CATEGORY_SMARTPHONE_ID].map((q) => ({
-  ...q,
-  id: `${q.id}-laptop`,
-  categoryId: CATEGORY_LAPTOP_ID,
-  text: q.id === 'q-screen-damage' ? 'Are there any scratches/dents/discoloration on the display?' : q.text,
-}));
-questionsByCategory[CATEGORY_SMARTWATCH_ID] = questionsByCategory[CATEGORY_SMARTPHONE_ID].map((q) => ({
-  ...q,
-  id: `${q.id}-watch`,
-  categoryId: CATEGORY_SMARTWATCH_ID,
-}));

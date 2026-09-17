@@ -2,6 +2,8 @@ import {
   AnswerTranslation,
   Brand,
   BuybackRequest,
+  BuybackStatusHistory,
+  BuybackVendorCalculationLog,
   Category,
   DepreciationConfig,
   DepreciationMatrixEntry,
@@ -13,10 +15,10 @@ import {
   PartnerCategoryVendorMapping,
   PartnerType,
   Product,
-  Question,
   QuestionAnswerMapping,
   QuestionTranslation,
   QuestionnaireConfig,
+  RequestStatusMaster,
   Role,
   Session,
   Sku,
@@ -77,7 +79,6 @@ export interface CatalogRepository {
   getBrand(brandId: number): Promise<Brand | undefined>;
   getProduct(productId: number): Promise<Product | undefined>;
   getSku(skuId: number): Promise<Sku | undefined>;
-  listQuestions(categoryId: number): Promise<Question[]>;
 }
 
 export interface BuybackRepository {
@@ -165,7 +166,8 @@ export interface ResolvedQuestionnaireQuestion {
   type: MasterQuestion['type'];
   sequence: number;
   text: string;
-  answers: { answerId: number; code: string; text: string }[];
+  /** `questionAnswerId` is the id to submit back (and what depreciation_matrix.questionAnswerId matches against) - `answerId` is just the underlying MasterAnswer, exposed for reference. */
+  answers: { questionAnswerId: number; answerId: number; code: string; text: string }[];
 }
 
 export interface QuestionnaireConfigRepository {
@@ -200,6 +202,22 @@ export interface SkuPricingRepository {
   list(filter?: { vendorId?: number; skuId?: number; isActive?: boolean }): Promise<SkuPricing[]>;
   /** All active price rows for this vendor + SKU (not yet filtered by validity window - the caller decides "as of" which date). */
   listForVendorSku(vendorId: number, skuId: number): Promise<SkuPricing[]>;
+}
+
+export interface RequestStatusMasterRepository {
+  list(filter?: { isActive?: boolean }): Promise<RequestStatusMaster[]>;
+  findById(id: number): Promise<RequestStatusMaster | undefined>;
+  findByName(name: string): Promise<RequestStatusMaster | undefined>;
+}
+
+export interface BuybackStatusHistoryRepository {
+  record(entry: BuybackStatusHistory): Promise<BuybackStatusHistory>;
+  listByBuybackRequest(buybackRequestId: number): Promise<BuybackStatusHistory[]>;
+}
+
+export interface BuybackVendorCalculationLogRepository {
+  record(entry: BuybackVendorCalculationLog): Promise<BuybackVendorCalculationLog>;
+  listByBuybackRequest(buybackRequestId: number): Promise<BuybackVendorCalculationLog[]>;
 }
 
 export interface DepreciationConfigRepository {
