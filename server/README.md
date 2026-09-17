@@ -221,16 +221,16 @@ winner; these tables don't do that picking themselves, they just supply the inpu
 `partnerType: 'vendor'` (the same table already used for retailer partners like BestBuy).
 
 ```
-partners (partnerType='retailer') ──┐
-                                     ├──▶ partner_category_vendor_mapping ──▶ partners (partnerType='vendor')
-product_categories ──────────────────┘                                            │
-                                                                                     ▼
+partner_locations ────────────────────┐
+                                       ├──▶ partner_category_vendor_mapping ──▶ partners (partnerType='vendor')
+product_categories ────────────────────┘                                            │
+                                                                                       ▼
                                                                               sku_pricing ◀── skus
 ```
 
 | Table | Description | Foreign keys |
 | --- | --- | --- |
-| `partner_category_vendor_mapping` | Which vendor(s) a retail partner uses for buybacks in a given category. **Not unique** on (partnerId, productCategoryId) - a partner can have several eligible vendors per category (e.g. BestBuy uses both Goldie Group and QuickCash Trading for Smartphones in the seed data) | `partnerId` → partners.id (retailer), `productCategoryId` → product_categories.id, `vendorId` → partners.id (vendor) |
+| `partner_category_vendor_mapping` | Which vendor(s) a retail partner's specific *location* uses for buybacks in a given category - scoped to `partnerLocationId` rather than `partnerId`, since two locations of the same partner may route to different vendors. **Not unique** on (partnerLocationId, productCategoryId) - a location can have several eligible vendors per category (e.g. BestBuy New York uses both Goldie Group and QuickCash Trading for Smartphones in the seed data) | `partnerLocationId` → partner_locations.id, `productCategoryId` → product_categories.id, `vendorId` → partners.id (vendor) |
 | `sku_pricing` | A vendor's buyback price for one SKU, with a validity window (`validFrom`/`validTo`, blank `validTo` = open-ended/current) - **this is now the only source of pricing in the whole app**; `products`/`skus` carry no price column at all, since the same SKU is priced differently by every vendor and changes over time | `vendorId` → partners.id (vendor), `skuId` → skus.id, `uploadedById` → users.id |
 
 Per your explicit choice when this module was scoped: `partnerType` is **not** validated on
@@ -241,7 +241,7 @@ and/or the calculation engine itself to enforce later.
 
 Besides plain CRUD + `POST .../search`, each module exposes a `POST .../resolve`
 convenience matching the calculation engine's expected lookup pattern:
-- `POST /api/partner-category-vendor-mapping/resolve` - body `{ partnerId, productCategoryId }` → the active vendor `Partner` rows for that pair.
+- `POST /api/partner-category-vendor-mapping/resolve` - body `{ partnerLocationId, productCategoryId }` → the active vendor `Partner` rows for that pair.
 - `POST /api/sku-pricing/resolve` - body `{ vendorId, skuId, asOf? }` → the single price row (or `null`) whose validity window covers `asOf` (defaults to now).
 
 **The live buyback flow already depends on this module** - `products.basePrice` and
@@ -249,10 +249,9 @@ convenience matching the calculation engine's expected lookup pattern:
 /api/buyback/:id/valuation` now calls `resolveBestVendorPrice()`
 (`src/services/valuation.service.ts`) to get its base device price:
 
-1. Look up the logged-in promoter's own retail partner, via `user.partnerLocationId` ->
-   `partner_locations.partnerId` (same resolution as login - see "Authentication, sessions
-   & role-based access" below).
-2. Find every vendor mapped to that partner + the buyback's category
+1. Look up the logged-in promoter's own `partnerLocationId` (same resolution as login -
+   see "Authentication, sessions & role-based access" below).
+2. Find every vendor mapped to that *location* + the buyback's category
    (`partner_category_vendor_mapping`).
 3. For each such vendor, find its currently-valid price for the buyback's SKU
    (`sku_pricing`, filtered by `validFrom`/`validTo`).
@@ -264,7 +263,7 @@ Step 4 is intentionally simple - it exists only to keep the buyback flow functio
 that the catalog has no price of its own. The real "calculate multiple buyback values,
 store them, and finalize a vendor based on our algorithm" engine is the next phase; when
 it ships, it should replace `resolveBestVendorPrice()` rather than needing to touch the
-route that calls it. If the promoter's partner has no vendor mapped for that category, or
+route that calls it. If the promoter's location has no vendor mapped for that category, or
 no mapped vendor has priced that SKU yet, valuation now fails with a `422` rather than
 silently using a stale catalog price.
 
@@ -460,11 +459,11 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `GET /api/questionnaire-config/:id` | Fetch a config row |
 | `POST /api/questionnaire-config/search` | List/filter config rows |
 | `POST /api/questionnaire-config/resolve` | **Main endpoint**: body `{ productCategoryId, brandId?, partnerId?, language? }` → the resolved, sequenced questionnaire |
-| `POST /api/partner-category-vendor-mapping` | Map a vendor to a (retail partner, category) pair |
+| `POST /api/partner-category-vendor-mapping` | Map a vendor to a (retail partner location, category) pair |
 | `PATCH /api/partner-category-vendor-mapping/:id` | Update a mapping (e.g. change vendor, deactivate) |
 | `GET /api/partner-category-vendor-mapping/:id` | Fetch a mapping |
-| `POST /api/partner-category-vendor-mapping/search` | List/filter mappings (body: `{ partnerId?, productCategoryId?, vendorId?, isActive? }`) |
-| `POST /api/partner-category-vendor-mapping/resolve` | Calc-engine lookup: body `{ partnerId, productCategoryId }` → active vendor `Partner` rows |
+| `POST /api/partner-category-vendor-mapping/search` | List/filter mappings (body: `{ partnerLocationId?, productCategoryId?, vendorId?, isActive? }`) |
+| `POST /api/partner-category-vendor-mapping/resolve` | Calc-engine lookup: body `{ partnerLocationId, productCategoryId }` → active vendor `Partner` rows |
 | `POST /api/sku-pricing` | Add a vendor's price for a SKU (body: `{ vendorId, skuId, price, validFrom, validTo?, uploadedById? }` - `uploadedById` defaults to the caller) |
 | `PATCH /api/sku-pricing/:id` | Update a price row (e.g. close its `validTo`, correct the price, deactivate) |
 | `GET /api/sku-pricing/:id` | Fetch a price row |

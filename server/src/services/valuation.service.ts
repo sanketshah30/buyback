@@ -16,8 +16,8 @@ export interface VendorPriceCandidate {
  * now that the catalog itself carries no price at all (see the
  * `Product`/`Sku` doc comments in types/domain.ts) - pricing comes entirely
  * from the vendor pricing module: every vendor mapped to this retail
- * partner + category (`partner_category_vendor_mapping`) that has an
- * active, currently-valid price for this SKU (`sku_pricing`) is a
+ * partner *location* + category (`partner_category_vendor_mapping`) that
+ * has an active, currently-valid price for this SKU (`sku_pricing`) is a
  * candidate.
  *
  * **Placeholder vendor-selection algorithm**: picks the highest currently
@@ -28,12 +28,12 @@ export interface VendorPriceCandidate {
  * existing buyback flow functional in the meantime.
  */
 export async function resolveBestVendorPrice(
-  partnerId: number,
+  partnerLocationId: number,
   productCategoryId: number,
   skuId: number,
   asOf: Date = new Date(),
 ): Promise<VendorPriceCandidate | undefined> {
-  const mappings = await partnerCategoryVendorMappingRepository.listVendorsFor(partnerId, productCategoryId);
+  const mappings = await partnerCategoryVendorMappingRepository.listVendorsFor(partnerLocationId, productCategoryId);
 
   const candidates: VendorPriceCandidate[] = [];
   for (const mapping of mappings) {

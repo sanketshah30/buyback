@@ -275,7 +275,7 @@ buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
       return res.status(422).json({ error: 'Your account is not assigned to a partner location, so no vendor pricing is configured for you.' });
     }
 
-    const vendorPrice = await resolveBestVendorPrice(partnerLocation.partnerId, request.category.id, request.sku.id);
+    const vendorPrice = await resolveBestVendorPrice(partnerLocation.id, request.category.id, request.sku.id);
     if (!vendorPrice) {
       return res.status(422).json({ error: 'No vendor has an active price configured for this SKU yet.' });
     }

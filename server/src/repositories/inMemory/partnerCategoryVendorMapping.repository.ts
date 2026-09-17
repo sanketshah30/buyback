@@ -3,17 +3,17 @@ import { PartnerCategoryVendorMappingRepository } from '../interfaces';
 import { indexes, tables } from './db';
 import { addToIndex, getIndexed, removeFromIndex } from './indexUtils';
 
-function profileKey(partnerId: number, productCategoryId: number): string {
-  return `${partnerId}:${productCategoryId}`;
+function profileKey(partnerLocationId: number, productCategoryId: number): string {
+  return `${partnerLocationId}:${productCategoryId}`;
 }
 
 export class InMemoryPartnerCategoryVendorMappingRepository implements PartnerCategoryVendorMappingRepository {
   async create(mapping: PartnerCategoryVendorMapping): Promise<PartnerCategoryVendorMapping> {
     tables.partnerCategoryVendorMappings.set(mapping.id, mapping);
-    addToIndex(indexes.partnerCategoryVendorMappingsByPartnerId, mapping.partnerId, mapping.id);
+    addToIndex(indexes.partnerCategoryVendorMappingsByPartnerLocationId, mapping.partnerLocationId, mapping.id);
     addToIndex(indexes.partnerCategoryVendorMappingsByCategoryId, mapping.productCategoryId, mapping.id);
     addToIndex(indexes.partnerCategoryVendorMappingsByVendorId, mapping.vendorId, mapping.id);
-    addToIndex(indexes.partnerCategoryVendorMappingsByPartnerCategory, profileKey(mapping.partnerId, mapping.productCategoryId), mapping.id);
+    addToIndex(indexes.partnerCategoryVendorMappingsByLocationCategory, profileKey(mapping.partnerLocationId, mapping.productCategoryId), mapping.id);
     return mapping;
   }
 
@@ -25,12 +25,12 @@ export class InMemoryPartnerCategoryVendorMappingRepository implements PartnerCa
     const updated: PartnerCategoryVendorMapping = { ...existing, ...patch, id: existing.id, updatedAt: new Date().toISOString() };
     tables.partnerCategoryVendorMappings.set(id, updated);
 
-    const partnerChanged = patch.partnerId !== undefined && patch.partnerId !== existing.partnerId;
+    const locationChanged = patch.partnerLocationId !== undefined && patch.partnerLocationId !== existing.partnerLocationId;
     const categoryChanged = patch.productCategoryId !== undefined && patch.productCategoryId !== existing.productCategoryId;
     const vendorChanged = patch.vendorId !== undefined && patch.vendorId !== existing.vendorId;
-    if (partnerChanged) {
-      removeFromIndex(indexes.partnerCategoryVendorMappingsByPartnerId, existing.partnerId, id);
-      addToIndex(indexes.partnerCategoryVendorMappingsByPartnerId, updated.partnerId, id);
+    if (locationChanged) {
+      removeFromIndex(indexes.partnerCategoryVendorMappingsByPartnerLocationId, existing.partnerLocationId, id);
+      addToIndex(indexes.partnerCategoryVendorMappingsByPartnerLocationId, updated.partnerLocationId, id);
     }
     if (categoryChanged) {
       removeFromIndex(indexes.partnerCategoryVendorMappingsByCategoryId, existing.productCategoryId, id);
@@ -40,9 +40,9 @@ export class InMemoryPartnerCategoryVendorMappingRepository implements PartnerCa
       removeFromIndex(indexes.partnerCategoryVendorMappingsByVendorId, existing.vendorId, id);
       addToIndex(indexes.partnerCategoryVendorMappingsByVendorId, updated.vendorId, id);
     }
-    if (partnerChanged || categoryChanged) {
-      removeFromIndex(indexes.partnerCategoryVendorMappingsByPartnerCategory, profileKey(existing.partnerId, existing.productCategoryId), id);
-      addToIndex(indexes.partnerCategoryVendorMappingsByPartnerCategory, profileKey(updated.partnerId, updated.productCategoryId), id);
+    if (locationChanged || categoryChanged) {
+      removeFromIndex(indexes.partnerCategoryVendorMappingsByLocationCategory, profileKey(existing.partnerLocationId, existing.productCategoryId), id);
+      addToIndex(indexes.partnerCategoryVendorMappingsByLocationCategory, profileKey(updated.partnerLocationId, updated.productCategoryId), id);
     }
     return updated;
   }
@@ -52,16 +52,16 @@ export class InMemoryPartnerCategoryVendorMappingRepository implements PartnerCa
   }
 
   async list(filter?: {
-    partnerId?: number;
+    partnerLocationId?: number;
     productCategoryId?: number;
     vendorId?: number;
     isActive?: boolean;
   }): Promise<PartnerCategoryVendorMapping[]> {
     let result: PartnerCategoryVendorMapping[];
-    if (filter?.partnerId !== undefined && filter?.productCategoryId !== undefined) {
-      result = getIndexed(indexes.partnerCategoryVendorMappingsByPartnerCategory, profileKey(filter.partnerId, filter.productCategoryId), tables.partnerCategoryVendorMappings);
-    } else if (filter?.partnerId !== undefined) {
-      result = getIndexed(indexes.partnerCategoryVendorMappingsByPartnerId, filter.partnerId, tables.partnerCategoryVendorMappings);
+    if (filter?.partnerLocationId !== undefined && filter?.productCategoryId !== undefined) {
+      result = getIndexed(indexes.partnerCategoryVendorMappingsByLocationCategory, profileKey(filter.partnerLocationId, filter.productCategoryId), tables.partnerCategoryVendorMappings);
+    } else if (filter?.partnerLocationId !== undefined) {
+      result = getIndexed(indexes.partnerCategoryVendorMappingsByPartnerLocationId, filter.partnerLocationId, tables.partnerCategoryVendorMappings);
     } else if (filter?.productCategoryId !== undefined) {
       result = getIndexed(indexes.partnerCategoryVendorMappingsByCategoryId, filter.productCategoryId, tables.partnerCategoryVendorMappings);
     } else if (filter?.vendorId !== undefined) {
@@ -74,8 +74,8 @@ export class InMemoryPartnerCategoryVendorMappingRepository implements PartnerCa
     return result;
   }
 
-  async listVendorsFor(partnerId: number, productCategoryId: number): Promise<PartnerCategoryVendorMapping[]> {
-    return getIndexed(indexes.partnerCategoryVendorMappingsByPartnerCategory, profileKey(partnerId, productCategoryId), tables.partnerCategoryVendorMappings).filter(
+  async listVendorsFor(partnerLocationId: number, productCategoryId: number): Promise<PartnerCategoryVendorMapping[]> {
+    return getIndexed(indexes.partnerCategoryVendorMappingsByLocationCategory, profileKey(partnerLocationId, productCategoryId), tables.partnerCategoryVendorMappings).filter(
       (m) => m.isActive,
     );
   }

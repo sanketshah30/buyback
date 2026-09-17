@@ -1,7 +1,7 @@
 import { PartnerCategoryVendorMapping, SkuPricing } from '../types/domain';
 import { reserveIdRange } from '../utils/idGenerator';
 import { CATEGORY_LAPTOP_ID, CATEGORY_SMARTPHONE_ID, CATEGORY_SMARTWATCH_ID, CATEGORY_TABLET_ID } from './catalog.seed';
-import { PARTNER_BESTBUY_ID, PARTNER_GOLDIE_GROUP_ID, PARTNER_QUICKCASH_TRADING_ID } from './partner.seed';
+import { LOCATION_BESTBUY_NYC_ID, PARTNER_GOLDIE_GROUP_ID, PARTNER_QUICKCASH_TRADING_ID } from './partner.seed';
 import { DEMO_PROMOTER_USER_ID } from './user.seed';
 
 const SEEDED_AT = '2026-01-01T00:00:00.000Z';
@@ -9,17 +9,20 @@ const audit = { createdAt: SEEDED_AT, updatedAt: SEEDED_AT, isActive: true };
 
 /**
  * Table: partner_category_vendor_mapping
- * BestBuy uses Goldie Group across every category, plus a second eligible
- * vendor (QuickCash Trading) for Smartphones specifically - demonstrating
- * the "many vendors per partner+category" case the calculation engine
- * needs to evaluate.
+ * Scoped per *location*, not the partner overall, since two locations of
+ * the same partner can route to different vendors - the demo promoter
+ * user is assigned to BestBuy New York (see data/user.seed.ts), so these
+ * mappings are seeded under that location. BestBuy New York uses Goldie
+ * Group across every category, plus a second eligible vendor (QuickCash
+ * Trading) for Smartphones specifically - demonstrating the "many vendors
+ * per location+category" case the calculation engine needs to evaluate.
  */
 export const partnerCategoryVendorMappings: PartnerCategoryVendorMapping[] = [
-  { id: 1, partnerId: PARTNER_BESTBUY_ID, productCategoryId: CATEGORY_SMARTPHONE_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
-  { id: 2, partnerId: PARTNER_BESTBUY_ID, productCategoryId: CATEGORY_SMARTPHONE_ID, vendorId: PARTNER_QUICKCASH_TRADING_ID, ...audit },
-  { id: 3, partnerId: PARTNER_BESTBUY_ID, productCategoryId: CATEGORY_LAPTOP_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
-  { id: 4, partnerId: PARTNER_BESTBUY_ID, productCategoryId: CATEGORY_TABLET_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
-  { id: 5, partnerId: PARTNER_BESTBUY_ID, productCategoryId: CATEGORY_SMARTWATCH_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
+  { id: 1, partnerLocationId: LOCATION_BESTBUY_NYC_ID, productCategoryId: CATEGORY_SMARTPHONE_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
+  { id: 2, partnerLocationId: LOCATION_BESTBUY_NYC_ID, productCategoryId: CATEGORY_SMARTPHONE_ID, vendorId: PARTNER_QUICKCASH_TRADING_ID, ...audit },
+  { id: 3, partnerLocationId: LOCATION_BESTBUY_NYC_ID, productCategoryId: CATEGORY_LAPTOP_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
+  { id: 4, partnerLocationId: LOCATION_BESTBUY_NYC_ID, productCategoryId: CATEGORY_TABLET_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
+  { id: 5, partnerLocationId: LOCATION_BESTBUY_NYC_ID, productCategoryId: CATEGORY_SMARTWATCH_ID, vendorId: PARTNER_GOLDIE_GROUP_ID, ...audit },
 ];
 
 /**

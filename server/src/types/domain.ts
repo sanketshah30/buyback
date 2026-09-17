@@ -399,17 +399,21 @@ export interface Session extends BaseEntity {
 
 /**
  * Table: partner_category_vendor_mapping
- * Which vendor(s) a retail partner uses for buybacks in a given product
- * category. Deliberately **not unique** on (partnerId, productCategoryId) -
- * a partner can have several eligible vendors per category, and the
- * calculation engine evaluates all of them before picking one.
- * FKs: partnerId -> partners.id (the retailer), productCategoryId ->
+ * Which vendor(s) a retail partner's specific *location* uses for buybacks
+ * in a given product category - scoped to `partnerLocationId` rather than
+ * `partnerId`, since two locations of the same partner (e.g. "BestBuy New
+ * York" vs. "BestBuy Dallas") may route to different vendors. Deliberately
+ * **not unique** on (partnerLocationId, productCategoryId) - a location can
+ * have several eligible vendors per category, and the calculation engine
+ * evaluates all of them before picking one.
+ * FKs: partnerLocationId -> partner_locations.id, productCategoryId ->
  * product_categories.id, vendorId -> partners.id (the vendor). Indexed on
- * partnerId, productCategoryId, vendorId, and the (partnerId,
- * productCategoryId) pair together (the engine's main lookup pattern).
+ * partnerLocationId, productCategoryId, vendorId, and the
+ * (partnerLocationId, productCategoryId) pair together (the engine's main
+ * lookup pattern).
  */
 export interface PartnerCategoryVendorMapping extends BaseEntity {
-  partnerId: number;
+  partnerLocationId: number;
   productCategoryId: number;
   vendorId: number;
 }

@@ -109,11 +109,11 @@ export const indexes = {
   questionnaireConfigsByProfile: new Map<string, Set<number>>() as Index<string>,
   questionnaireConfigsByCategory: new Map<number, Set<number>>() as Index<number>,
 
-  partnerCategoryVendorMappingsByPartnerId: new Map<number, Set<number>>() as Index<number>,
+  partnerCategoryVendorMappingsByPartnerLocationId: new Map<number, Set<number>>() as Index<number>,
   partnerCategoryVendorMappingsByCategoryId: new Map<number, Set<number>>() as Index<number>,
   partnerCategoryVendorMappingsByVendorId: new Map<number, Set<number>>() as Index<number>,
-  // Composite index matching PartnerCategoryVendorMappingRepository.listVendorsFor(): `${partnerId}:${productCategoryId}`
-  partnerCategoryVendorMappingsByPartnerCategory: new Map<string, Set<number>>() as Index<string>,
+  // Composite index matching PartnerCategoryVendorMappingRepository.listVendorsFor(): `${partnerLocationId}:${productCategoryId}`
+  partnerCategoryVendorMappingsByLocationCategory: new Map<string, Set<number>>() as Index<string>,
 
   skuPricingByVendorId: new Map<number, Set<number>>() as Index<number>,
   skuPricingBySkuId: new Map<number, Set<number>>() as Index<number>,
@@ -179,10 +179,10 @@ for (const entry of depreciationMatrix) {
   addToIndex(indexes.depreciationMatrixByQuestionAnswerId, entry.questionAnswerId, entry.id);
 }
 for (const mapping of partnerCategoryVendorMappings) {
-  addToIndex(indexes.partnerCategoryVendorMappingsByPartnerId, mapping.partnerId, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByPartnerLocationId, mapping.partnerLocationId, mapping.id);
   addToIndex(indexes.partnerCategoryVendorMappingsByCategoryId, mapping.productCategoryId, mapping.id);
   addToIndex(indexes.partnerCategoryVendorMappingsByVendorId, mapping.vendorId, mapping.id);
-  addToIndex(indexes.partnerCategoryVendorMappingsByPartnerCategory, `${mapping.partnerId}:${mapping.productCategoryId}`, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByLocationCategory, `${mapping.partnerLocationId}:${mapping.productCategoryId}`, mapping.id);
 }
 for (const pricing of skuPricing) {
   addToIndex(indexes.skuPricingByVendorId, pricing.vendorId, pricing.id);

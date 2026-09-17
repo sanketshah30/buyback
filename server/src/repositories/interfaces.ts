@@ -188,9 +188,9 @@ export interface PartnerCategoryVendorMappingRepository {
   create(mapping: PartnerCategoryVendorMapping): Promise<PartnerCategoryVendorMapping>;
   update(id: number, patch: Partial<PartnerCategoryVendorMapping>): Promise<PartnerCategoryVendorMapping>;
   findById(id: number): Promise<PartnerCategoryVendorMapping | undefined>;
-  list(filter?: { partnerId?: number; productCategoryId?: number; vendorId?: number; isActive?: boolean }): Promise<PartnerCategoryVendorMapping[]>;
-  /** All active vendors mapped for this retail partner + category - the calculation engine's main lookup. */
-  listVendorsFor(partnerId: number, productCategoryId: number): Promise<PartnerCategoryVendorMapping[]>;
+  list(filter?: { partnerLocationId?: number; productCategoryId?: number; vendorId?: number; isActive?: boolean }): Promise<PartnerCategoryVendorMapping[]>;
+  /** All active vendors mapped for this retail partner location + category - the calculation engine's main lookup. */
+  listVendorsFor(partnerLocationId: number, productCategoryId: number): Promise<PartnerCategoryVendorMapping[]>;
 }
 
 export interface SkuPricingRepository {
