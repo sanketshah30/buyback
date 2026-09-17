@@ -41,24 +41,26 @@ export const BRAND_HP_ID = 6;
 /**
  * Table: products
  * FKs: categoryId -> product_categories.id, brandId -> brands.id
+ * No price column - see vendorPricing.seed.ts / the SkuPricing doc comment
+ * in types/domain.ts for where pricing actually lives now.
  */
 export const products: Product[] = [
-  { id: 1, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_APPLE_ID, name: 'iPhone 13', basePrice: 32000, ...audit },
-  { id: 2, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_APPLE_ID, name: 'iPhone 14', basePrice: 42000, ...audit },
-  { id: 3, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy S22', basePrice: 30000, ...audit },
-  { id: 4, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy S23', basePrice: 40000, ...audit },
-  { id: 5, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_ONEPLUS_ID, name: 'OnePlus 11', basePrice: 28000, ...audit },
-  { id: 6, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_XIAOMI_ID, name: 'Redmi Note 12', basePrice: 9000, ...audit },
+  { id: 1, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_APPLE_ID, name: 'iPhone 13', ...audit },
+  { id: 2, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_APPLE_ID, name: 'iPhone 14', ...audit },
+  { id: 3, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy S22', ...audit },
+  { id: 4, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy S23', ...audit },
+  { id: 5, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_ONEPLUS_ID, name: 'OnePlus 11', ...audit },
+  { id: 6, categoryId: CATEGORY_SMARTPHONE_ID, brandId: BRAND_XIAOMI_ID, name: 'Redmi Note 12', ...audit },
 
-  { id: 7, categoryId: CATEGORY_TABLET_ID, brandId: BRAND_APPLE_ID, name: 'iPad (9th Gen)', basePrice: 18000, ...audit },
-  { id: 8, categoryId: CATEGORY_TABLET_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy Tab S8', basePrice: 22000, ...audit },
+  { id: 7, categoryId: CATEGORY_TABLET_ID, brandId: BRAND_APPLE_ID, name: 'iPad (9th Gen)', ...audit },
+  { id: 8, categoryId: CATEGORY_TABLET_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy Tab S8', ...audit },
 
-  { id: 9, categoryId: CATEGORY_LAPTOP_ID, brandId: BRAND_APPLE_ID, name: 'MacBook Air M1', basePrice: 55000, ...audit },
-  { id: 10, categoryId: CATEGORY_LAPTOP_ID, brandId: BRAND_DELL_ID, name: 'XPS 13', basePrice: 48000, ...audit },
-  { id: 11, categoryId: CATEGORY_LAPTOP_ID, brandId: BRAND_HP_ID, name: 'Pavilion 15', basePrice: 32000, ...audit },
+  { id: 9, categoryId: CATEGORY_LAPTOP_ID, brandId: BRAND_APPLE_ID, name: 'MacBook Air M1', ...audit },
+  { id: 10, categoryId: CATEGORY_LAPTOP_ID, brandId: BRAND_DELL_ID, name: 'XPS 13', ...audit },
+  { id: 11, categoryId: CATEGORY_LAPTOP_ID, brandId: BRAND_HP_ID, name: 'Pavilion 15', ...audit },
 
-  { id: 12, categoryId: CATEGORY_SMARTWATCH_ID, brandId: BRAND_APPLE_ID, name: 'Apple Watch Series 7', basePrice: 15000, ...audit },
-  { id: 13, categoryId: CATEGORY_SMARTWATCH_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy Watch 5', basePrice: 12000, ...audit },
+  { id: 12, categoryId: CATEGORY_SMARTWATCH_ID, brandId: BRAND_APPLE_ID, name: 'Apple Watch Series 7', ...audit },
+  { id: 13, categoryId: CATEGORY_SMARTWATCH_ID, brandId: BRAND_SAMSUNG_ID, name: 'Galaxy Watch 5', ...audit },
 ];
 export const PRODUCT_IPHONE_13_ID = 1;
 export const PRODUCT_IPHONE_14_ID = 2;
@@ -67,29 +69,30 @@ export const PRODUCT_MACBOOK_AIR_M1_ID = 9;
 /**
  * Table: skus
  * FK: productId -> products.id
+ * No price column - see the `products` doc comment above.
  */
 export const skus: Sku[] = [
-  { id: 1, productId: PRODUCT_IPHONE_13_ID, code: 'IP13-128-BLU', label: '128GB / Blue', priceModifier: 0, ...audit },
-  { id: 2, productId: PRODUCT_IPHONE_13_ID, code: 'IP13-256-BLK', label: '256GB / Midnight', priceModifier: 3000, ...audit },
+  { id: 1, productId: PRODUCT_IPHONE_13_ID, code: 'IP13-128-BLU', label: '128GB / Blue', ...audit },
+  { id: 2, productId: PRODUCT_IPHONE_13_ID, code: 'IP13-256-BLK', label: '256GB / Midnight', ...audit },
 
-  { id: 3, productId: PRODUCT_IPHONE_14_ID, code: 'IP14-128-BLU', label: '128GB / Blue', priceModifier: 0, ...audit },
-  { id: 4, productId: PRODUCT_IPHONE_14_ID, code: 'IP14-256-STL', label: '256GB / Starlight', priceModifier: 4000, ...audit },
+  { id: 3, productId: PRODUCT_IPHONE_14_ID, code: 'IP14-128-BLU', label: '128GB / Blue', ...audit },
+  { id: 4, productId: PRODUCT_IPHONE_14_ID, code: 'IP14-256-STL', label: '256GB / Starlight', ...audit },
 
-  { id: 5, productId: 3, code: 'S22-128-GRN', label: '128GB / Green', priceModifier: 0, ...audit },
-  { id: 6, productId: 4, code: 'S23-256-CRM', label: '256GB / Cream', priceModifier: 2500, ...audit },
+  { id: 5, productId: 3, code: 'S22-128-GRN', label: '128GB / Green', ...audit },
+  { id: 6, productId: 4, code: 'S23-256-CRM', label: '256GB / Cream', ...audit },
 
-  { id: 7, productId: 5, code: 'OP11-256-GRN', label: '256GB / Eternal Green', priceModifier: 0, ...audit },
-  { id: 8, productId: 6, code: 'RN12-128-GRY', label: '128GB / Grey', priceModifier: 0, ...audit },
+  { id: 7, productId: 5, code: 'OP11-256-GRN', label: '256GB / Eternal Green', ...audit },
+  { id: 8, productId: 6, code: 'RN12-128-GRY', label: '128GB / Grey', ...audit },
 
-  { id: 9, productId: 7, code: 'IPAD9-64-SLV', label: '64GB / Silver / Wi-Fi', priceModifier: 0, ...audit },
-  { id: 10, productId: 8, code: 'TABS8-128-GRP', label: '128GB / Graphite', priceModifier: 0, ...audit },
+  { id: 9, productId: 7, code: 'IPAD9-64-SLV', label: '64GB / Silver / Wi-Fi', ...audit },
+  { id: 10, productId: 8, code: 'TABS8-128-GRP', label: '128GB / Graphite', ...audit },
 
-  { id: 11, productId: PRODUCT_MACBOOK_AIR_M1_ID, code: 'MBA-M1-256-GLD', label: '256GB / Gold', priceModifier: 0, ...audit },
-  { id: 12, productId: 10, code: 'XPS13-512-SLV', label: '512GB / Platinum Silver', priceModifier: 5000, ...audit },
-  { id: 13, productId: 11, code: 'PAV15-512-NAT', label: '512GB / Natural Silver', priceModifier: 0, ...audit },
+  { id: 11, productId: PRODUCT_MACBOOK_AIR_M1_ID, code: 'MBA-M1-256-GLD', label: '256GB / Gold', ...audit },
+  { id: 12, productId: 10, code: 'XPS13-512-SLV', label: '512GB / Platinum Silver', ...audit },
+  { id: 13, productId: 11, code: 'PAV15-512-NAT', label: '512GB / Natural Silver', ...audit },
 
-  { id: 14, productId: 12, code: 'AW7-41-MID', label: '41mm / Midnight', priceModifier: 0, ...audit },
-  { id: 15, productId: 13, code: 'GW5-44-GRP', label: '44mm / Graphite', priceModifier: 0, ...audit },
+  { id: 14, productId: 12, code: 'AW7-41-MID', label: '41mm / Midnight', ...audit },
+  { id: 15, productId: 13, code: 'GW5-44-GRP', label: '44mm / Graphite', ...audit },
 ];
 export const SKU_IPHONE_13_128_BLUE_ID = 1;
 export const SKU_MACBOOK_AIR_M1_256_GOLD_ID = 11;

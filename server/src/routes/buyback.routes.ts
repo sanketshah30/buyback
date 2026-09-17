@@ -1,5 +1,5 @@
 import { NextFunction, Response, Router } from 'express';
-import { catalogRepository, buybackRepository } from '../repositories';
+import { catalogRepository, buybackRepository, partnerLocationRepository, userRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { requireRight } from '../middleware/rights.middleware';
 import { toPublicUrl, upload } from '../middleware/upload.middleware';
@@ -7,7 +7,7 @@ import { assessmentService } from '../services/assessment.service';
 import { authService } from '../services/auth.service';
 import { diagnosisService } from '../services/diagnosis.service';
 import { notificationService } from '../services/notification.service';
-import { applyDiagnosisAdjustment, applyNoDiagnosisDrop, computeMaxValue } from '../services/valuation.service';
+import { applyDiagnosisAdjustment, applyNoDiagnosisDrop, computeMaxValue, resolveBestVendorPrice } from '../services/valuation.service';
 import { BuybackRequest, QuestionnaireAnswer } from '../types/domain';
 import { dateKey, formatBuybackDisplayId } from '../utils/id';
 import { nextId } from '../utils/idGenerator';
@@ -264,9 +264,24 @@ buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
       return res.status(400).json({ error: 'Physical assessment must be completed before valuation' });
     }
 
+    // The catalog carries no price at all anymore - resolve it from the
+    // vendor pricing module instead, using the logged-in promoter's own
+    // retail partner (see "Vendor pricing module" in server/README.md).
+    const promoter = await userRepository.findById(req.auth!.userId);
+    const partnerLocation = promoter?.partnerLocationId !== undefined
+      ? await partnerLocationRepository.findById(promoter.partnerLocationId)
+      : undefined;
+    if (!partnerLocation) {
+      return res.status(422).json({ error: 'Your account is not assigned to a partner location, so no vendor pricing is configured for you.' });
+    }
+
+    const vendorPrice = await resolveBestVendorPrice(partnerLocation.partnerId, request.category.id, request.sku.id);
+    if (!vendorPrice) {
+      return res.status(422).json({ error: 'No vendor has an active price configured for this SKU yet.' });
+    }
+
     const questions = await catalogRepository.listQuestions(request.category.id);
-    const basePrice = request.product.basePrice + request.sku.priceModifier;
-    const maxValue = computeMaxValue(basePrice, questions, request.questionnaireAnswers);
+    const maxValue = computeMaxValue(vendorPrice.price, questions, request.questionnaireAnswers);
 
     const sequence = await buybackRepository.nextDailySequence(dateKey());
     const displayId = formatBuybackDisplayId(sequence);
@@ -274,6 +289,7 @@ buybackRouter.post('/:id/valuation', async (req: AuthedRequest, res, next) => {
     const updated = await buybackRepository.update(request.id, {
       displayId,
       maxValue,
+      selectedVendorId: vendorPrice.vendorId,
       status: 'valuation_ready',
     });
     return res.json(updated);

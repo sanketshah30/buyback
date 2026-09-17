@@ -40,23 +40,27 @@ export interface Brand extends BaseEntity {
  * FKs: categoryId -> product_categories.id, brandId -> brands.id
  * Indexed on (categoryId, brandId) - the app always looks products up by
  * that pair when a user drills into a specific brand's lineup.
+ *
+ * No price column here - pricing lives entirely in `SkuPricing` now (see
+ * the vendor pricing module below), since the same product/SKU is priced
+ * differently by every vendor and changes over time. The catalog only
+ * describes *what* a product/SKU is, never what it's worth.
  */
 export interface Product extends BaseEntity {
   categoryId: number;
   brandId: number;
   name: string;
-  basePrice: number;
 }
 
 /**
  * Table: skus
  * FK: productId -> products.id (indexed - SKUs are always looked up per product)
+ * No price column - see the `Product` doc comment above.
  */
 export interface Sku extends BaseEntity {
   productId: number;
   code: string;
   label: string;
-  priceModifier: number;
 }
 
 /**
@@ -169,6 +173,8 @@ export interface BuybackRequest {
   assessmentImageUrls?: string[];
   assessmentVideoUrl?: string;
   maxValue?: number;
+  /** Which vendor's price (from `sku_pricing`) was used for `maxValue` - see `resolveBestVendorPrice()` in valuation.service.ts. FK: partners.id. */
+  selectedVendorId?: number;
   withDiagnosis?: boolean;
   diagnosis?: DiagnosisState;
   finalValue?: number;
@@ -409,11 +415,10 @@ export interface PartnerCategoryVendorMapping extends BaseEntity {
 
 /**
  * Table: sku_pricing
- * A vendor's buyback price for a specific SKU, kept separate from the
- * read-only product catalog (`skus.priceModifier` etc.) since the *same*
- * SKU can be priced differently by every vendor, and a vendor's price for a
- * SKU changes over time (`validFrom`/`validTo`) - the catalog is not the
- * source of truth for what a vendor will actually pay.
+ * A vendor's buyback price for a specific SKU. This is the *only* source of
+ * pricing in the whole app now - `Product`/`Sku` carry no price columns at
+ * all, since the *same* SKU is priced differently by every vendor, and a
+ * vendor's price for a SKU changes over time (`validFrom`/`validTo`).
  * FKs: vendorId -> partners.id (a `partnerType: 'vendor'` row - see module
  * doc comment above), skuId -> skus.id, uploadedById -> users.id. Indexed
  * on vendorId, skuId, and the (vendorId, skuId) pair together (the engine's

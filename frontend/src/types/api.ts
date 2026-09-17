@@ -21,18 +21,19 @@ export interface Brand extends BaseEntity {
   name: string;
 }
 
+// No price fields here - pricing now lives entirely in the vendor pricing
+// module (server-side sku_pricing table), since the same product/SKU is
+// priced differently by every vendor.
 export interface Product extends BaseEntity {
   categoryId: number;
   brandId: number;
   name: string;
-  basePrice: number;
 }
 
 export interface Sku extends BaseEntity {
   productId: number;
   code: string;
   label: string;
-  priceModifier: number;
 }
 
 export interface SkuAlias extends BaseEntity {
@@ -122,6 +123,7 @@ export interface BuybackRequest {
   assessmentImageUrls?: string[];
   assessmentVideoUrl?: string;
   maxValue?: number;
+  selectedVendorId?: number;
   withDiagnosis?: boolean;
   diagnosis?: DiagnosisState;
   finalValue?: number;

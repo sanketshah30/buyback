@@ -230,7 +230,7 @@ product_categories ──────────────────┘    
 | Table | Description | Foreign keys |
 | --- | --- | --- |
 | `partner_category_vendor_mapping` | Which vendor(s) a retail partner uses for buybacks in a given category. **Not unique** on (partnerId, productCategoryId) - a partner can have several eligible vendors per category (e.g. BestBuy uses both Goldie Group and QuickCash Trading for Smartphones in the seed data) | `partnerId` → partners.id (retailer), `productCategoryId` → product_categories.id, `vendorId` → partners.id (vendor) |
-| `sku_pricing` | A vendor's buyback price for one SKU, with a validity window (`validFrom`/`validTo`, blank `validTo` = open-ended/current) - kept separate from the read-only catalog since the same SKU is priced differently by every vendor and changes over time | `vendorId` → partners.id (vendor), `skuId` → skus.id, `uploadedById` → users.id |
+| `sku_pricing` | A vendor's buyback price for one SKU, with a validity window (`validFrom`/`validTo`, blank `validTo` = open-ended/current) - **this is now the only source of pricing in the whole app**; `products`/`skus` carry no price column at all, since the same SKU is priced differently by every vendor and changes over time | `vendorId` → partners.id (vendor), `skuId` → skus.id, `uploadedById` → users.id |
 
 Per your explicit choice when this module was scoped: `partnerType` is **not** validated on
 create/update (a `partnerId`/`vendorId` just needs to exist in `partners`, regardless of
@@ -242,6 +242,30 @@ Besides plain CRUD + `POST .../search`, each module exposes a `POST .../resolve`
 convenience matching the calculation engine's expected lookup pattern:
 - `POST /api/partner-category-vendor-mapping/resolve` - body `{ partnerId, productCategoryId }` → the active vendor `Partner` rows for that pair.
 - `POST /api/sku-pricing/resolve` - body `{ vendorId, skuId, asOf? }` → the single price row (or `null`) whose validity window covers `asOf` (defaults to now).
+
+**The live buyback flow already depends on this module** - `products.basePrice` and
+`skus.priceModifier` were removed once pricing moved here, so `POST
+/api/buyback/:id/valuation` now calls `resolveBestVendorPrice()`
+(`src/services/valuation.service.ts`) to get its base device price:
+
+1. Look up the logged-in promoter's own retail partner, via `user.partnerLocationId` ->
+   `partner_locations.partnerId` (same resolution as login - see "Authentication, sessions
+   & role-based access" below).
+2. Find every vendor mapped to that partner + the buyback's category
+   (`partner_category_vendor_mapping`).
+3. For each such vendor, find its currently-valid price for the buyback's SKU
+   (`sku_pricing`, filtered by `validFrom`/`validTo`).
+4. **Placeholder vendor-selection algorithm**: take the highest currently-valid candidate
+   price (the best deal for the customer) and record which vendor won it on
+   `BuybackRequest.selectedVendorId`.
+
+Step 4 is intentionally simple - it exists only to keep the buyback flow functional now
+that the catalog has no price of its own. The real "calculate multiple buyback values,
+store them, and finalize a vendor based on our algorithm" engine is the next phase; when
+it ships, it should replace `resolveBestVendorPrice()` rather than needing to touch the
+route that calls it. If the promoter's partner has no vendor mapped for that category, or
+no mapped vendor has priced that SKU yet, valuation now fails with a `422` rather than
+silently using a stale catalog price.
 
 ## Authentication, sessions & role-based access
 
