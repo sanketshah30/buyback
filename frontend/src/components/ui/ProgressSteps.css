@@ -1,0 +1,15 @@
+.progress-steps {
+  display: flex;
+  gap: 6px;
+}
+
+.progress-steps__dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--color-border);
+}
+
+.progress-steps__dot--done {
+  background: var(--color-gold);
+}

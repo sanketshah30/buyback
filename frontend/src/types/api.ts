@@ -1,0 +1,152 @@
+// Mirrors server/src/types/domain.ts. Kept as a plain duplicate for this MVP
+// since frontend and server are independently deployable packages; consider
+// extracting a shared `packages/types` workspace once the API stabilizes.
+
+export interface BaseEntity {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
+}
+
+export type DeviceCategoryType = 'smartphone' | 'non-smartphone';
+
+export interface Category extends BaseEntity {
+  name: string;
+  type: DeviceCategoryType;
+}
+
+/** Standalone - not scoped to a category. See server/src/types/domain.ts. */
+export interface Brand extends BaseEntity {
+  name: string;
+}
+
+// No price fields here - pricing now lives entirely in the vendor pricing
+// module (server-side sku_pricing table), since the same product/SKU is
+// priced differently by every vendor.
+export interface Product extends BaseEntity {
+  categoryId: number;
+  brandId: number;
+  name: string;
+}
+
+export interface Sku extends BaseEntity {
+  productId: number;
+  code: string;
+  label: string;
+}
+
+export interface SkuAlias extends BaseEntity {
+  skuId: number;
+  partnerId: string;
+  partnerSkuName: string;
+}
+
+export type QuestionType = 'single-choice' | 'multi-choice';
+
+/** The resolved, per-(category, brand, partner) questionnaire - see POST /api/questionnaire-config/resolve. */
+export interface ResolvedQuestionnaireQuestion {
+  questionId: number;
+  type: QuestionType;
+  sequence: number;
+  text: string;
+  answers: { questionAnswerId: number; answerId: number; code: string; text: string }[];
+}
+
+export type AssessmentMethod = 'questionnaire' | 'image' | 'video';
+
+/** `questionAnswerIds` reference `ResolvedQuestionnaireQuestion.answers[].questionAnswerId`. */
+export interface QuestionnaireAnswer {
+  questionId: number;
+  questionAnswerIds: number[];
+}
+
+export type BuybackStatus =
+  | 'draft'
+  | 'device_captured'
+  | 'product_selected'
+  | 'assessment_completed'
+  | 'valuation_ready'
+  | 'diagnosis_pending'
+  | 'diagnosis_completed'
+  | 'value_finalized'
+  | 'customer_info_pending'
+  | 'otp_verified'
+  | 'document_uploaded'
+  | 'product_images_uploaded'
+  | 'confirmed';
+
+export type DiagnosisStatus = 'not_started' | 'pending' | 'in_progress' | 'completed';
+
+export interface DiagnosisState {
+  diagnosisId: string;
+  qrToken: string;
+  status: DiagnosisStatus;
+  pollCount: number;
+  requiredPolls: number;
+  resultAdjustmentPercent?: number;
+  findings?: string[];
+  completedAt?: string;
+}
+
+export interface AiAssessmentResult {
+  method: 'image' | 'video';
+  mediaCount: number;
+  generatedAnswers: QuestionnaireAnswer[];
+  summary: string;
+  confidence: number;
+}
+
+export interface CustomerInfo {
+  name: string;
+  email: string;
+  mobile: string;
+}
+
+export interface BuybackRequest {
+  id: number;
+  referenceId?: string;
+  userId: number;
+  status: BuybackStatus;
+  requestStatusId?: number;
+  partnerLocationId?: number;
+  category?: Category;
+  brand?: Brand;
+  product?: Product;
+  sku?: Sku;
+  identifier?: { type: 'imei' | 'serial'; value: string };
+  assessmentMethod?: AssessmentMethod;
+  questionnaireAnswers?: QuestionnaireAnswer[];
+  aiAssessment?: AiAssessmentResult;
+  assessmentImageUrls?: string[];
+  assessmentVideoUrl?: string;
+  /** The customer-facing value - equal to customerValue below. */
+  maxValue?: number;
+  allocatedVendorId?: number;
+  retailerValue?: number;
+  customerValue?: number;
+  vendorPayable?: number;
+  withDiagnosis?: boolean;
+  diagnosis?: DiagnosisState;
+  finalValue?: number;
+  customer?: CustomerInfo;
+  customerOtp?: { requestId: string; verified: boolean };
+  documentProofUrl?: string;
+  productImageUrls?: string[];
+  createdAt: string;
+  updatedAt: string;
+  confirmedAt?: string;
+}
+
+export interface User {
+  id: number;
+  mobile: string;
+  name?: string;
+  createdAt: string;
+}
+
+export interface Role {
+  id: number;
+  name: string;
+  rights: string[];
+}

@@ -1,0 +1,136 @@
+.accordion-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+  /* No overflow:hidden here - the Select dropdown menu inside the active
+     section's body is absolutely positioned and needs to be able to
+     overflow this card's rounded corners to remain visible. */
+}
+
+.accordion-section--active {
+  border-color: var(--color-gold);
+}
+
+.accordion-section--pending {
+  opacity: 0.45;
+}
+
+.accordion-section__header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.accordion-section__header--editable {
+  cursor: pointer;
+}
+
+.accordion-section__header--editable:hover,
+.accordion-section__header--editable:focus-visible {
+  background: var(--color-surface-raised);
+  outline: none;
+}
+
+.accordion-section__edit {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.accordion-section__header--editable:hover .accordion-section__edit,
+.accordion-section__header--editable:focus-visible .accordion-section__edit {
+  color: var(--color-gold);
+}
+
+.accordion-section__index {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}
+
+.accordion-section--active .accordion-section__index {
+  background: linear-gradient(135deg, var(--color-gold-soft), var(--color-gold));
+  color: #14110a;
+}
+
+.accordion-section--done .accordion-section__index {
+  background: var(--color-gold-dim);
+  color: var(--color-gold);
+}
+
+.accordion-section__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.accordion-section__title {
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.accordion-section--pending .accordion-section__title {
+  color: var(--color-text-muted);
+}
+
+.accordion-section__summary {
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--color-gold-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accordion-section__body {
+  padding: 0 18px 20px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.accordion-inline-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--color-gold-soft);
+}
+
+.accordion-inline-status::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-gold);
+  animation: accordion-status-spin 0.8s linear infinite;
+}
+
+@keyframes accordion-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.accordion-retry-link {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}

@@ -1,0 +1,219 @@
+import { products, skuAliases, skus } from '../../data/catalog.seed';
+import { depreciationConfigs, depreciationMatrix } from '../../data/depreciation.seed';
+import { partnerLocations, partners, roles } from '../../data/partner.seed';
+import {
+  answerTranslations,
+  masterAnswers,
+  masterQuestions,
+  questionAnswerMappings,
+  questionTranslations,
+  questionnaireConfigs,
+} from '../../data/questionnaireConfig.seed';
+import { partnerMarginConfigs, vendorFeeConfigs } from '../../data/partnerFinancials.seed';
+import { requestStatuses } from '../../data/requestStatus.seed';
+import { users, userRoles as seededUserRoles } from '../../data/user.seed';
+import { partnerCategoryVendorMappings, skuPricing } from '../../data/vendorPricing.seed';
+import {
+  AnswerTranslation,
+  BuybackRequest,
+  BuybackStatusHistory,
+  BuybackVendorCalculationLog,
+  DepreciationConfig,
+  DepreciationMatrixEntry,
+  MasterAnswer,
+  MasterQuestion,
+  OtpChallenge,
+  Partner,
+  PartnerLocation,
+  Product,
+  QuestionAnswerMapping,
+  QuestionTranslation,
+  QuestionnaireConfig,
+  RequestStatusMaster,
+  Role,
+  PartnerCategoryVendorMapping,
+  PartnerMarginConfig,
+  Session,
+  Sku,
+  SkuAlias,
+  SkuPricing,
+  User,
+  UserLocationHistory,
+  UserRole,
+  VendorFeeConfig,
+} from '../../types/domain';
+import { addToIndex, Index } from './indexUtils';
+
+/**
+ * A single process-memory "database". Data resets whenever the server
+ * restarts - this is intentional for the MVP. Replace this module with a
+ * MySQL connection pool (e.g. `mysql2/promise`) when persistence is needed.
+ *
+ * Every table's primary Map is keyed by its integer primary key (the
+ * equivalent of a clustered index on the PK). Alongside each, `indexes`
+ * below maintains secondary indexes for every foreign key / frequently
+ * filtered column, matching what a real `CREATE INDEX` statement would
+ * define once this moves to MySQL - see server/README.md for the full list.
+ *
+ * Partner/location/role/questionnaire-config tables are seeded but fully
+ * mutable (unlike the read-only product catalog) since onboarding new
+ * partners/locations/roles/questions is a first-class feature of those
+ * modules.
+ */
+export const tables = {
+  // Whitelisted, predefined staff/promoter accounts - see data/user.seed.ts.
+  // Unlike the old MVP behavior, logging in never auto-creates a row here.
+  users: new Map<number, User>(users.map((u) => [u.id, u])),
+  otpChallenges: new Map<string, OtpChallenge>(), // keyed by the opaque requestId, not an integer PK - see OtpChallenge doc comment
+  sessions: new Map<number, Session>(), // one row per completed login - see Session doc comment
+  buybackRequests: new Map<number, BuybackRequest>(),
+  dailySequences: new Map<string, number>(), // dateKey -> last count (business display-ID counter, not a table)
+
+  products: new Map<number, Product>(products.map((p) => [p.id, p])),
+  skus: new Map<number, Sku>(skus.map((s) => [s.id, s])),
+  skuAliases: new Map<number, SkuAlias>(skuAliases.map((a) => [a.id, a])),
+
+  partners: new Map<number, Partner>(partners.map((p) => [p.id, p])),
+  partnerLocations: new Map<number, PartnerLocation>(partnerLocations.map((l) => [l.id, l])),
+  roles: new Map<number, Role>(roles.map((r) => [r.id, r])),
+  userRoles: new Map<number, UserRole>(seededUserRoles.map((ur) => [ur.id, ur])),
+  userLocationHistory: new Map<number, UserLocationHistory>(),
+
+  partnerCategoryVendorMappings: new Map<number, PartnerCategoryVendorMapping>(partnerCategoryVendorMappings.map((m) => [m.id, m])),
+  skuPricing: new Map<number, SkuPricing>(skuPricing.map((p) => [p.id, p])),
+  depreciationConfigs: new Map<number, DepreciationConfig>(depreciationConfigs.map((c) => [c.id, c])),
+  depreciationMatrix: new Map<number, DepreciationMatrixEntry>(depreciationMatrix.map((m) => [m.id, m])),
+
+  masterQuestions: new Map<number, MasterQuestion>(masterQuestions.map((q) => [q.id, q])),
+  questionTranslations: new Map<number, QuestionTranslation>(questionTranslations.map((t) => [t.id, t])),
+  masterAnswers: new Map<number, MasterAnswer>(masterAnswers.map((a) => [a.id, a])),
+  answerTranslations: new Map<number, AnswerTranslation>(answerTranslations.map((t) => [t.id, t])),
+  questionAnswerMappings: new Map<number, QuestionAnswerMapping>(questionAnswerMappings.map((m) => [m.id, m])),
+  questionnaireConfigs: new Map<number, QuestionnaireConfig>(questionnaireConfigs.map((c) => [c.id, c])),
+
+  requestStatusMaster: new Map<number, RequestStatusMaster>(requestStatuses.map((s) => [s.id, s])),
+  buybackStatusHistory: new Map<number, BuybackStatusHistory>(),
+  buybackVendorCalculationLog: new Map<number, BuybackVendorCalculationLog>(),
+
+  partnerMarginConfigs: new Map<number, PartnerMarginConfig>(partnerMarginConfigs.map((c) => [c.id, c])),
+  vendorFeeConfigs: new Map<number, VendorFeeConfig>(vendorFeeConfigs.map((c) => [c.id, c])),
+};
+
+/** Secondary indexes - see the module doc comment above. */
+export const indexes = {
+  usersByMobile: new Map<string, number>(), // unique index
+  usersByPartnerLocationId: new Map<number, Set<number>>() as Index<number>,
+  buybackRequestsByUserId: new Map<number, Set<number>>() as Index<number>,
+  sessionsByToken: new Map<string, number>(), // unique index
+  sessionsByUserId: new Map<number, Set<number>>() as Index<number>,
+
+  partnerLocationsByPartnerId: new Map<number, Set<number>>() as Index<number>,
+  userRolesByUserId: new Map<number, Set<number>>() as Index<number>,
+  userLocationHistoryByUserId: new Map<number, Set<number>>() as Index<number>,
+
+  productsByCategoryAndBrand: new Map<string, Set<number>>() as Index<string>,
+  productsByCategory: new Map<number, Set<number>>() as Index<number>,
+  skusByProductId: new Map<number, Set<number>>() as Index<number>,
+  skuAliasesBySkuId: new Map<number, Set<number>>() as Index<number>,
+
+  questionTranslationsByQuestionId: new Map<number, Set<number>>() as Index<number>,
+  answerTranslationsByAnswerId: new Map<number, Set<number>>() as Index<number>,
+  questionAnswerMappingsByQuestionId: new Map<number, Set<number>>() as Index<number>,
+  // Composite index matching exactly how QuestionnaireConfigRepository.resolve() queries: `${categoryId}:${brandId ?? 'null'}:${partnerId ?? 'null'}`
+  questionnaireConfigsByProfile: new Map<string, Set<number>>() as Index<string>,
+  questionnaireConfigsByCategory: new Map<number, Set<number>>() as Index<number>,
+
+  partnerCategoryVendorMappingsByPartnerLocationId: new Map<number, Set<number>>() as Index<number>,
+  partnerCategoryVendorMappingsByCategoryId: new Map<number, Set<number>>() as Index<number>,
+  partnerCategoryVendorMappingsByVendorId: new Map<number, Set<number>>() as Index<number>,
+  // Composite index matching PartnerCategoryVendorMappingRepository.listVendorsFor(): `${partnerLocationId}:${productCategoryId}`
+  partnerCategoryVendorMappingsByLocationCategory: new Map<string, Set<number>>() as Index<string>,
+
+  skuPricingByVendorId: new Map<number, Set<number>>() as Index<number>,
+  skuPricingBySkuId: new Map<number, Set<number>>() as Index<number>,
+  // Composite index matching SkuPricingRepository.listForVendorSku(): `${vendorId}:${skuId}`
+  skuPricingByVendorSku: new Map<string, Set<number>>() as Index<string>,
+
+  depreciationConfigsByCategory: new Map<number, Set<number>>() as Index<number>,
+  depreciationConfigsByBrand: new Map<number, Set<number>>() as Index<number>,
+  // Composite index matching DepreciationConfigRepository.findActive(): `${productCategoryId}:${brandId}:${vendorId ?? 'null'}`
+  depreciationConfigsByProfile: new Map<string, Set<number>>() as Index<string>,
+  depreciationMatrixByConfigId: new Map<number, Set<number>>() as Index<number>,
+  depreciationMatrixByQuestionAnswerId: new Map<number, Set<number>>() as Index<number>,
+
+  buybackStatusHistoryByBuybackRequestId: new Map<number, Set<number>>() as Index<number>,
+  buybackVendorCalculationLogByBuybackRequestId: new Map<number, Set<number>>() as Index<number>,
+
+  // Composite index matching PartnerMarginConfigRepository.resolve(): `${partnerId}:${partnerLocationId}:${productCategoryId}` - partnerLocationId is a literal 0 sentinel here, never null (see PartnerMarginConfig doc comment).
+  partnerMarginConfigsByScope: new Map<string, Set<number>>() as Index<string>,
+  // Composite index matching VendorFeeConfigRepository.resolve(): `${vendorId}:${productCategoryId}`
+  vendorFeeConfigsByScope: new Map<string, Set<number>>() as Index<string>,
+};
+
+export function profileKey(categoryId: number, brandId: number | null, partnerId: number | null): string {
+  return `${categoryId}:${brandId ?? 'null'}:${partnerId ?? 'null'}`;
+}
+
+// Populate indexes for seeded rows (rows created later via the API maintain
+// these incrementally in their respective repository's create/update methods).
+for (const user of users) {
+  indexes.usersByMobile.set(user.mobile, user.id);
+  if (user.partnerLocationId !== undefined) {
+    addToIndex(indexes.usersByPartnerLocationId, user.partnerLocationId, user.id);
+  }
+}
+for (const userRole of seededUserRoles) {
+  addToIndex(indexes.userRolesByUserId, userRole.userId, userRole.id);
+}
+for (const location of partnerLocations) {
+  addToIndex(indexes.partnerLocationsByPartnerId, location.partnerId, location.id);
+}
+for (const translation of questionTranslations) {
+  addToIndex(indexes.questionTranslationsByQuestionId, translation.questionId, translation.id);
+}
+for (const translation of answerTranslations) {
+  addToIndex(indexes.answerTranslationsByAnswerId, translation.answerId, translation.id);
+}
+for (const mapping of questionAnswerMappings) {
+  addToIndex(indexes.questionAnswerMappingsByQuestionId, mapping.questionId, mapping.id);
+}
+for (const config of questionnaireConfigs) {
+  addToIndex(indexes.questionnaireConfigsByProfile, profileKey(config.productCategoryId, config.brandId, config.partnerId), config.id);
+  addToIndex(indexes.questionnaireConfigsByCategory, config.productCategoryId, config.id);
+}
+for (const product of products) {
+  addToIndex(indexes.productsByCategory, product.categoryId, product.id);
+  addToIndex(indexes.productsByCategoryAndBrand, `${product.categoryId}:${product.brandId}`, product.id);
+}
+for (const sku of skus) {
+  addToIndex(indexes.skusByProductId, sku.productId, sku.id);
+}
+for (const alias of skuAliases) {
+  addToIndex(indexes.skuAliasesBySkuId, alias.skuId, alias.id);
+}
+for (const config of depreciationConfigs) {
+  addToIndex(indexes.depreciationConfigsByCategory, config.productCategoryId, config.id);
+  addToIndex(indexes.depreciationConfigsByBrand, config.brandId, config.id);
+  addToIndex(indexes.depreciationConfigsByProfile, profileKey(config.productCategoryId, config.brandId, config.vendorId), config.id);
+}
+for (const entry of depreciationMatrix) {
+  addToIndex(indexes.depreciationMatrixByConfigId, entry.depreciationConfigId, entry.id);
+  addToIndex(indexes.depreciationMatrixByQuestionAnswerId, entry.questionAnswerId, entry.id);
+}
+for (const mapping of partnerCategoryVendorMappings) {
+  addToIndex(indexes.partnerCategoryVendorMappingsByPartnerLocationId, mapping.partnerLocationId, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByCategoryId, mapping.productCategoryId, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByVendorId, mapping.vendorId, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByLocationCategory, `${mapping.partnerLocationId}:${mapping.productCategoryId}`, mapping.id);
+}
+for (const pricing of skuPricing) {
+  addToIndex(indexes.skuPricingByVendorId, pricing.vendorId, pricing.id);
+  addToIndex(indexes.skuPricingBySkuId, pricing.skuId, pricing.id);
+  addToIndex(indexes.skuPricingByVendorSku, `${pricing.vendorId}:${pricing.skuId}`, pricing.id);
+}
+for (const config of partnerMarginConfigs) {
+  addToIndex(indexes.partnerMarginConfigsByScope, `${config.partnerId}:${config.partnerLocationId}:${config.productCategoryId}`, config.id);
+}
+for (const config of vendorFeeConfigs) {
+  addToIndex(indexes.vendorFeeConfigsByScope, `${config.vendorId}:${config.productCategoryId}`, config.id);
+}
