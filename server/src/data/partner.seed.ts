@@ -30,9 +30,22 @@ export const partners: Partner[] = [
     uniqueIdentifier: 'VND-GOLDIE-001',
     ...audit,
   },
+  {
+    id: 3,
+    name: 'QuickCash Trading',
+    address: '88 Circuit Ave',
+    city: 'San Jose',
+    state: 'CA',
+    zipCode: '95112',
+    country: 'USA',
+    partnerType: 'vendor',
+    uniqueIdentifier: 'VND-QUICKCASH-001',
+    ...audit,
+  },
 ];
 export const PARTNER_BESTBUY_ID = 1;
 export const PARTNER_GOLDIE_GROUP_ID = 2;
+export const PARTNER_QUICKCASH_TRADING_ID = 3;
 
 /** Table: partner_locations - FK: partnerId -> partners.id */
 export const partnerLocations: PartnerLocation[] = [

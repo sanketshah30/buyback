@@ -8,6 +8,7 @@ import {
   OtpChallenge,
   Partner,
   PartnerLocation,
+  PartnerCategoryVendorMapping,
   PartnerType,
   Product,
   Question,
@@ -18,6 +19,7 @@ import {
   Session,
   Sku,
   SkuAlias,
+  SkuPricing,
   User,
   UserLocationHistory,
   UserRole,
@@ -178,4 +180,22 @@ export interface QuestionnaireConfigRepository {
    * Returns an empty array when no tier matches at all (e.g. unknown category).
    */
   resolve(productCategoryId: number, brandId: number | undefined, partnerId: number | undefined, language: string): Promise<ResolvedQuestionnaireQuestion[]>;
+}
+
+export interface PartnerCategoryVendorMappingRepository {
+  create(mapping: PartnerCategoryVendorMapping): Promise<PartnerCategoryVendorMapping>;
+  update(id: number, patch: Partial<PartnerCategoryVendorMapping>): Promise<PartnerCategoryVendorMapping>;
+  findById(id: number): Promise<PartnerCategoryVendorMapping | undefined>;
+  list(filter?: { partnerId?: number; productCategoryId?: number; vendorId?: number; isActive?: boolean }): Promise<PartnerCategoryVendorMapping[]>;
+  /** All active vendors mapped for this retail partner + category - the calculation engine's main lookup. */
+  listVendorsFor(partnerId: number, productCategoryId: number): Promise<PartnerCategoryVendorMapping[]>;
+}
+
+export interface SkuPricingRepository {
+  create(pricing: SkuPricing): Promise<SkuPricing>;
+  update(id: number, patch: Partial<SkuPricing>): Promise<SkuPricing>;
+  findById(id: number): Promise<SkuPricing | undefined>;
+  list(filter?: { vendorId?: number; skuId?: number; isActive?: boolean }): Promise<SkuPricing[]>;
+  /** All active price rows for this vendor + SKU (not yet filtered by validity window - the caller decides "as of" which date). */
+  listForVendorSku(vendorId: number, skuId: number): Promise<SkuPricing[]>;
 }

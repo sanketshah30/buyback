@@ -8,12 +8,14 @@ import { authRouter } from './routes/auth.routes';
 import { buybackRouter } from './routes/buyback.routes';
 import { catalogRouter } from './routes/catalog.routes';
 import { answersRouter } from './routes/answers.routes';
+import { partnerCategoryVendorMappingRouter } from './routes/partnerCategoryVendorMapping.routes';
 import { partnerLocationsRouter } from './routes/partnerLocations.routes';
 import { partnersRouter } from './routes/partners.routes';
 import { questionAnswersRouter } from './routes/questionAnswers.routes';
 import { questionnaireConfigRouter } from './routes/questionnaireConfig.routes';
 import { questionsRouter } from './routes/questions.routes';
 import { rolesRouter } from './routes/roles.routes';
+import { skuPricingRouter } from './routes/skuPricing.routes';
 import { uploadsRouter } from './routes/uploads.routes';
 import { usersRouter } from './routes/users.routes';
 
@@ -49,6 +51,10 @@ export function createApp() {
   app.use('/api/answers', answersRouter);
   app.use('/api/question-answers', questionAnswersRouter);
   app.use('/api/questionnaire-config', questionnaireConfigRouter);
+  // Vendor pricing module: which vendor(s) a partner uses per category, and
+  // each vendor's price per SKU - inputs to the upcoming valuation engine.
+  app.use('/api/partner-category-vendor-mapping', partnerCategoryVendorMappingRouter);
+  app.use('/api/sku-pricing', skuPricingRouter);
   // Uploaded ID documents / device photos - authenticated + ownership-checked,
   // never served as public static content. See routes/uploads.routes.ts.
   app.use('/api/uploads', uploadsRouter);

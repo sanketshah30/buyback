@@ -376,6 +376,59 @@ export interface Session extends BaseEntity {
   revokedAt?: string;
 }
 
+/**
+ * ---------------------------------------------------------------------
+ * Vendor pricing module (inputs to the upcoming buyback valuation/vendor
+ * selection engine)
+ * ---------------------------------------------------------------------
+ * "Vendor" is not a separate table - a vendor is simply a `Partner` row
+ * with `partnerType: 'vendor'` (the same `partners` table already used for
+ * retailer partners like BestBuy). These two tables let the future
+ * calculation engine answer "given this retail partner and this device's
+ * category/SKU, which vendor(s) could buy it, and at what price does each
+ * vendor currently offer for that SKU" - multiple buyback values get
+ * computed (one per eligible vendor) and the engine picks a winner.
+ */
+
+/**
+ * Table: partner_category_vendor_mapping
+ * Which vendor(s) a retail partner uses for buybacks in a given product
+ * category. Deliberately **not unique** on (partnerId, productCategoryId) -
+ * a partner can have several eligible vendors per category, and the
+ * calculation engine evaluates all of them before picking one.
+ * FKs: partnerId -> partners.id (the retailer), productCategoryId ->
+ * product_categories.id, vendorId -> partners.id (the vendor). Indexed on
+ * partnerId, productCategoryId, vendorId, and the (partnerId,
+ * productCategoryId) pair together (the engine's main lookup pattern).
+ */
+export interface PartnerCategoryVendorMapping extends BaseEntity {
+  partnerId: number;
+  productCategoryId: number;
+  vendorId: number;
+}
+
+/**
+ * Table: sku_pricing
+ * A vendor's buyback price for a specific SKU, kept separate from the
+ * read-only product catalog (`skus.priceModifier` etc.) since the *same*
+ * SKU can be priced differently by every vendor, and a vendor's price for a
+ * SKU changes over time (`validFrom`/`validTo`) - the catalog is not the
+ * source of truth for what a vendor will actually pay.
+ * FKs: vendorId -> partners.id (a `partnerType: 'vendor'` row - see module
+ * doc comment above), skuId -> skus.id, uploadedById -> users.id. Indexed
+ * on vendorId, skuId, and the (vendorId, skuId) pair together (the engine's
+ * main lookup pattern, further filtered by validFrom/validTo in memory).
+ */
+export interface SkuPricing extends BaseEntity {
+  vendorId: number;
+  skuId: number;
+  price: number;
+  validFrom: string;
+  /** Blank/undefined = open-ended - this is the vendor's current price for the SKU until a new row supersedes it. */
+  validTo?: string;
+  uploadedById: number;
+}
+
 export interface OtpChallenge {
   /**
    * Opaque, unguessable request handle handed to the client - deliberately

@@ -9,6 +9,7 @@ import {
   questionnaireConfigs,
 } from '../../data/questionnaireConfig.seed';
 import { users, userRoles as seededUserRoles } from '../../data/user.seed';
+import { partnerCategoryVendorMappings, skuPricing } from '../../data/vendorPricing.seed';
 import {
   AnswerTranslation,
   BuybackRequest,
@@ -22,9 +23,11 @@ import {
   QuestionTranslation,
   QuestionnaireConfig,
   Role,
+  PartnerCategoryVendorMapping,
   Session,
   Sku,
   SkuAlias,
+  SkuPricing,
   User,
   UserLocationHistory,
   UserRole,
@@ -66,6 +69,9 @@ export const tables = {
   userRoles: new Map<number, UserRole>(seededUserRoles.map((ur) => [ur.id, ur])),
   userLocationHistory: new Map<number, UserLocationHistory>(),
 
+  partnerCategoryVendorMappings: new Map<number, PartnerCategoryVendorMapping>(partnerCategoryVendorMappings.map((m) => [m.id, m])),
+  skuPricing: new Map<number, SkuPricing>(skuPricing.map((p) => [p.id, p])),
+
   masterQuestions: new Map<number, MasterQuestion>(masterQuestions.map((q) => [q.id, q])),
   questionTranslations: new Map<number, QuestionTranslation>(questionTranslations.map((t) => [t.id, t])),
   masterAnswers: new Map<number, MasterAnswer>(masterAnswers.map((a) => [a.id, a])),
@@ -97,6 +103,17 @@ export const indexes = {
   // Composite index matching exactly how QuestionnaireConfigRepository.resolve() queries: `${categoryId}:${brandId ?? 'null'}:${partnerId ?? 'null'}`
   questionnaireConfigsByProfile: new Map<string, Set<number>>() as Index<string>,
   questionnaireConfigsByCategory: new Map<number, Set<number>>() as Index<number>,
+
+  partnerCategoryVendorMappingsByPartnerId: new Map<number, Set<number>>() as Index<number>,
+  partnerCategoryVendorMappingsByCategoryId: new Map<number, Set<number>>() as Index<number>,
+  partnerCategoryVendorMappingsByVendorId: new Map<number, Set<number>>() as Index<number>,
+  // Composite index matching PartnerCategoryVendorMappingRepository.listVendorsFor(): `${partnerId}:${productCategoryId}`
+  partnerCategoryVendorMappingsByPartnerCategory: new Map<string, Set<number>>() as Index<string>,
+
+  skuPricingByVendorId: new Map<number, Set<number>>() as Index<number>,
+  skuPricingBySkuId: new Map<number, Set<number>>() as Index<number>,
+  // Composite index matching SkuPricingRepository.listForVendorSku(): `${vendorId}:${skuId}`
+  skuPricingByVendorSku: new Map<string, Set<number>>() as Index<string>,
 };
 
 export function profileKey(categoryId: number, brandId: number | null, partnerId: number | null): string {
@@ -139,4 +156,15 @@ for (const sku of skus) {
 }
 for (const alias of skuAliases) {
   addToIndex(indexes.skuAliasesBySkuId, alias.skuId, alias.id);
+}
+for (const mapping of partnerCategoryVendorMappings) {
+  addToIndex(indexes.partnerCategoryVendorMappingsByPartnerId, mapping.partnerId, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByCategoryId, mapping.productCategoryId, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByVendorId, mapping.vendorId, mapping.id);
+  addToIndex(indexes.partnerCategoryVendorMappingsByPartnerCategory, `${mapping.partnerId}:${mapping.productCategoryId}`, mapping.id);
+}
+for (const pricing of skuPricing) {
+  addToIndex(indexes.skuPricingByVendorId, pricing.vendorId, pricing.id);
+  addToIndex(indexes.skuPricingBySkuId, pricing.skuId, pricing.id);
+  addToIndex(indexes.skuPricingByVendorSku, `${pricing.vendorId}:${pricing.skuId}`, pricing.id);
 }

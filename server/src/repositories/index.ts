@@ -6,12 +6,14 @@ import { InMemoryMasterAnswerRepository } from './inMemory/masterAnswer.reposito
 import { InMemoryMasterQuestionRepository } from './inMemory/masterQuestion.repository';
 import { InMemoryOtpRepository } from './inMemory/otp.repository';
 import { InMemoryPartnerRepository } from './inMemory/partner.repository';
+import { InMemoryPartnerCategoryVendorMappingRepository } from './inMemory/partnerCategoryVendorMapping.repository';
 import { InMemoryPartnerLocationRepository } from './inMemory/partnerLocation.repository';
 import { InMemoryQuestionAnswerMappingRepository } from './inMemory/questionAnswerMapping.repository';
 import { InMemoryQuestionTranslationRepository } from './inMemory/questionTranslation.repository';
 import { InMemoryQuestionnaireConfigRepository } from './inMemory/questionnaireConfig.repository';
 import { InMemoryRoleRepository } from './inMemory/role.repository';
 import { InMemorySessionRepository } from './inMemory/session.repository';
+import { InMemorySkuPricingRepository } from './inMemory/skuPricing.repository';
 import { InMemoryUserRepository } from './inMemory/user.repository';
 import { InMemoryUserLocationHistoryRepository } from './inMemory/userLocationHistory.repository';
 import { InMemoryUserRoleRepository } from './inMemory/userRole.repository';
@@ -22,6 +24,7 @@ import {
   MasterAnswerRepository,
   MasterQuestionRepository,
   OtpRepository,
+  PartnerCategoryVendorMappingRepository,
   PartnerLocationRepository,
   PartnerRepository,
   QuestionAnswerMappingRepository,
@@ -29,6 +32,7 @@ import {
   QuestionnaireConfigRepository,
   RoleRepository,
   SessionRepository,
+  SkuPricingRepository,
   UserLocationHistoryRepository,
   UserRepository,
   UserRoleRepository,
@@ -69,3 +73,5 @@ export const masterAnswerRepository: MasterAnswerRepository = new InMemoryMaster
 export const answerTranslationRepository: AnswerTranslationRepository = new InMemoryAnswerTranslationRepository();
 export const questionAnswerMappingRepository: QuestionAnswerMappingRepository = new InMemoryQuestionAnswerMappingRepository();
 export const questionnaireConfigRepository: QuestionnaireConfigRepository = new InMemoryQuestionnaireConfigRepository();
+export const partnerCategoryVendorMappingRepository: PartnerCategoryVendorMappingRepository = new InMemoryPartnerCategoryVendorMappingRepository();
+export const skuPricingRepository: SkuPricingRepository = new InMemorySkuPricingRepository();

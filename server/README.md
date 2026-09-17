@@ -19,6 +19,7 @@ src/
   types/domain.ts         Shared domain types (BuybackRequest, Category, Question, ...)
   data/catalog.seed.ts    Mock catalog + configurable questionnaire data
   data/user.seed.ts       Predefined, whitelisted staff/promoter accounts + role assignments
+  data/vendorPricing.seed.ts  Partner->vendor mappings + per-vendor SKU pricing
   repositories/           Data-access interfaces + in-memory implementation
     interfaces.ts          <- contracts a future MySQL implementation must satisfy
     inMemory/               <- current mock implementation (Maps in process memory)
@@ -208,6 +209,40 @@ ties are never blended:
 If no tier has any config rows for that category at all (e.g. an unconfigured category),
 the response is an empty question list - there's no fallback below tier 4.
 
+## Vendor pricing module (inputs to the upcoming valuation/vendor-selection engine)
+
+Two tables that let a future calculation engine answer "given this retail partner and a
+device's category/SKU, which vendor(s) could buy it, and what does each currently pay for
+that SKU?" - the engine will compute a buyback value per eligible vendor and pick a
+winner; these tables don't do that picking themselves, they just supply the inputs.
+
+**"Vendor" is not a separate table** - a vendor is simply a `partners` row with
+`partnerType: 'vendor'` (the same table already used for retailer partners like BestBuy).
+
+```
+partners (partnerType='retailer') ──┐
+                                     ├──▶ partner_category_vendor_mapping ──▶ partners (partnerType='vendor')
+product_categories ──────────────────┘                                            │
+                                                                                     ▼
+                                                                              sku_pricing ◀── skus
+```
+
+| Table | Description | Foreign keys |
+| --- | --- | --- |
+| `partner_category_vendor_mapping` | Which vendor(s) a retail partner uses for buybacks in a given category. **Not unique** on (partnerId, productCategoryId) - a partner can have several eligible vendors per category (e.g. BestBuy uses both Goldie Group and QuickCash Trading for Smartphones in the seed data) | `partnerId` → partners.id (retailer), `productCategoryId` → product_categories.id, `vendorId` → partners.id (vendor) |
+| `sku_pricing` | A vendor's buyback price for one SKU, with a validity window (`validFrom`/`validTo`, blank `validTo` = open-ended/current) - kept separate from the read-only catalog since the same SKU is priced differently by every vendor and changes over time | `vendorId` → partners.id (vendor), `skuId` → skus.id, `uploadedById` → users.id |
+
+Per your explicit choice when this module was scoped: `partnerType` is **not** validated on
+create/update (a `partnerId`/`vendorId` just needs to exist in `partners`, regardless of
+its `partnerType`), and `sku_pricing` does **not** reject overlapping `validFrom`/`validTo`
+windows for the same vendor+SKU - both are left for the dedicated pricing-update interface
+and/or the calculation engine itself to enforce later.
+
+Besides plain CRUD + `POST .../search`, each module exposes a `POST .../resolve`
+convenience matching the calculation engine's expected lookup pattern:
+- `POST /api/partner-category-vendor-mapping/resolve` - body `{ partnerId, productCategoryId }` → the active vendor `Partner` rows for that pair.
+- `POST /api/sku-pricing/resolve` - body `{ vendorId, skuId, asOf? }` → the single price row (or `null`) whose validity window covers `asOf` (defaults to now).
+
 ## Authentication, sessions & role-based access
 
 Login is **whitelist-only staff/promoter login**, not open customer self-signup - this app
@@ -338,8 +373,18 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `GET /api/questionnaire-config/:id` | Fetch a config row |
 | `POST /api/questionnaire-config/search` | List/filter config rows |
 | `POST /api/questionnaire-config/resolve` | **Main endpoint**: body `{ productCategoryId, brandId?, partnerId?, language? }` → the resolved, sequenced questionnaire |
+| `POST /api/partner-category-vendor-mapping` | Map a vendor to a (retail partner, category) pair |
+| `PATCH /api/partner-category-vendor-mapping/:id` | Update a mapping (e.g. change vendor, deactivate) |
+| `GET /api/partner-category-vendor-mapping/:id` | Fetch a mapping |
+| `POST /api/partner-category-vendor-mapping/search` | List/filter mappings (body: `{ partnerId?, productCategoryId?, vendorId?, isActive? }`) |
+| `POST /api/partner-category-vendor-mapping/resolve` | Calc-engine lookup: body `{ partnerId, productCategoryId }` → active vendor `Partner` rows |
+| `POST /api/sku-pricing` | Add a vendor's price for a SKU (body: `{ vendorId, skuId, price, validFrom, validTo?, uploadedById? }` - `uploadedById` defaults to the caller) |
+| `PATCH /api/sku-pricing/:id` | Update a price row (e.g. close its `validTo`, correct the price, deactivate) |
+| `GET /api/sku-pricing/:id` | Fetch a price row |
+| `POST /api/sku-pricing/search` | List/filter price rows (body: `{ vendorId?, skuId?, isActive? }`) |
+| `POST /api/sku-pricing/resolve` | Calc-engine lookup: body `{ vendorId, skuId, asOf? }` → the price row valid at that instant, or `null` |
 
-All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, and `/api/questionnaire-config/*` routes require `Authorization: Bearer <token>` from the OTP login flow. `/api/buyback/*` additionally requires the caller's role to grant the `process_buyback` right (see "Authentication, sessions & role-based access" above).
+All `/api/buyback/*`, `/api/uploads/*`, `/api/partners/*`, `/api/partner-locations/*`, `/api/roles/*`, `/api/users/*`, `/api/questions/*`, `/api/answers/*`, `/api/question-answers/*`, `/api/questionnaire-config/*`, `/api/partner-category-vendor-mapping/*`, and `/api/sku-pricing/*` routes require `Authorization: Bearer <token>` from the OTP login flow. `/api/buyback/*` additionally requires the caller's role to grant the `process_buyback` right (see "Authentication, sessions & role-based access" above).
 
 ### When does a buyback record actually get created?
 
