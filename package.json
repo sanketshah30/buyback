@@ -1,0 +1,21 @@
+{
+  "name": "buyback-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Agentic buyback assessment platform monorepo (frontend PWA + server API)",
+  "workspaces": [
+    "frontend",
+    "server"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace server",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build:server": "npm run build --workspace server",
+    "build:frontend": "npm run build --workspace frontend",
+    "lint:server": "npm run lint --workspace server",
+    "lint:frontend": "npm run lint --workspace frontend"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

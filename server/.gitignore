@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Local uploads (mock file storage - replace with S3/blob storage in production)
+uploads/*
+!uploads/.gitkeep
+
+# Local environment overrides (the tracked .env file holds MVP mock defaults only -
+# never put real secrets in it; use .env.local for machine-specific overrides instead)
+.env.local
+.env.*.local

@@ -1,0 +1,26 @@
+.method-option {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.method-option__icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-gold-soft), var(--color-gold));
+  color: #14110a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.method-option__title {
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.method-option__description {
+  margin-top: 4px;
+}
