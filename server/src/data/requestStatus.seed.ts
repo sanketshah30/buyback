@@ -26,5 +26,6 @@ export const requestStatuses: RequestStatusMaster[] = [
 ];
 export const REQUEST_STATUS_CREATED_ID = 1;
 export const REQUEST_STATUS_AMOUNT_CALCULATED_ID = 2;
+export const REQUEST_STATUS_BUYBACK_ACCEPTED_ID = 5;
 
 reserveIdRange('request_status_master', requestStatuses.length);

@@ -1,9 +1,8 @@
 import { env } from '../config/env';
 
-/** 35%-style drop applied when the customer skips the optional diagnosis step. */
+/** A fixed amount (not a percentage) deducted from maxValue when the customer skips the optional diagnosis step. */
 export function applyNoDiagnosisDrop(maxValue: number): number {
-  const drop = env.noDiagnosisValueDropPercent / 100;
-  return Math.max(0, Math.round(maxValue * (1 - drop)));
+  return Math.max(0, Math.round(maxValue - env.noDiagnosisFixedDeduction));
 }
 
 /** Recalculates the final value once the (mock) diagnosis result is in. */

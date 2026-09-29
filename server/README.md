@@ -369,6 +369,17 @@ If no vendor is mapped to the promoter's location for that category, or none of 
 mapped vendors has priced the SKU, the whole call fails with a `422` rather than silently
 allocating a zero/wrong value.
 
+**Two more transitions happen later in the flow**, past the allocate phase above, both via
+the same `recordStatusTransition()` helper:
+- `POST /api/buyback/:id/finalize-value` (the "Continue without diagnosis" path) applies a
+  **fixed** deduction (`NO_DIAGNOSIS_FIXED_DEDUCTION`, default 6000 - not a percentage) to
+  `maxValue` to get `finalValue`, and re-affirms `requestStatusId = 2` ("Amount
+  Calculated") with a *second* `buyback_status_history` row, distinct from the one logged
+  during allocation - `allocatedVendorId` is never touched here.
+- `POST /api/buyback/:id/customer/verify-otp`, once the customer's confirmation OTP
+  verifies successfully, advances `requestStatusId` to `5` ("Buyback Accepted") and logs
+  that transition too.
+
 ```
 buyback_requests ──1:N──▶ buyback_vendor_calculation_log ──▶ partners (vendor)
         │                          │        │
@@ -383,7 +394,7 @@ partner_locations (0 = wildcard) ──┘       product_categories ──┘
 
 | Table | Description | Foreign keys |
 | --- | --- | --- |
-| `request_status_master` | The full formal buyback lifecycle (12 rows, in `sequence` order) - only "Request Created" and "Amount Calculated" are wired into the live flow so far; the rest (diagnosis, logistics, payout) are seeded for upcoming phases | - |
+| `request_status_master` | The full formal buyback lifecycle (12 rows, in `sequence` order) - "Request Created", "Amount Calculated", and "Buyback Accepted" are wired into the live flow so far; the rest (diagnosis, remaining logistics, payout) are seeded for upcoming phases | - |
 | `buyback_status_history` | Append-only log of every `requestStatusId` transition a request goes through | `buybackRequestId` → buyback_requests.id, `requestStatusId` → request_status_master.id, `changedByUserId` → users.id |
 | `buyback_vendor_calculation_log` | One row per (buyback request, evaluated vendor) from the calculate phase - `skuPrice`, `totalDepreciationAmount`, and the final `buybackValue` (the Retailer value) are all stored, not just the final number, for full auditability | `buybackRequestId` → buyback_requests.id, `vendorId` → partners.id, `skuPricingId` → sku_pricing.id, `depreciationConfigId` → depreciation_config.id (nullable - a vendor may have no depreciation set configured at all, treated as zero deduction) |
 | `partner_margin_config` | The retail partner's commission %, deducted from Retailer value to get Customer value. `partnerLocationId` is a **literal, non-nullable `0` sentinel** ("applies to all of this partner's locations") - a deliberate departure from this codebase's usual `null`-wildcard convention, since it was specified that way; an exact location match still wins over the `0` row when both exist | `partnerId` → partners.id, `partnerLocationId` → partner_locations.id (or literal `0`), `productCategoryId` → product_categories.id |
@@ -467,7 +478,7 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 
 ## Mock behaviors to know about
 
-- **OTP**: always `123456` (configurable via `MOCK_OTP_CODE`) and echoed back in API responses as `devOtp` for easy testing (no real SMS/email gateway is wired up). SMS/email "sends" are logged to the server console. Verification is rate-limited to 5 incorrect attempts per OTP request before it's locked out.
+- **OTP**: always `123456` (configurable via `MOCK_OTP_CODE`) and echoed back in API responses as `devOtp` for easy testing (no real SMS/email gateway is wired up). SMS/email "sends" are logged to the server console. Verification is rate-limited to 5 incorrect attempts per OTP request before it's locked out. Expiry is purpose-specific: staff login OTPs last `LOGIN_OTP_TTL_MINUTES` (default 5), the customer buyback-confirmation OTP lasts the shorter `CONFIRMATION_OTP_TTL_MINUTES` (default 2).
 - **AI image/video assessment**: `src/services/assessment.service.ts` deterministically maps uploaded media to questionnaire answers instead of calling a real vision model.
 - **Diagnosis**: `src/services/diagnosis.service.ts` simulates a paired-device diagnosis; polling `GET /api/buyback/:id/diagnosis/status` a few times (`DIAGNOSIS_COMPLETE_AFTER_POLLS`) transitions it from `pending` -> `in_progress` -> `completed` with a mock condition adjustment.
 - **File uploads**: stored on local disk under `uploads/<buybackId>/` (gitignored), restricted to image/video files, and only ever served back through the authenticated, ownership-checked `GET /api/uploads/:buybackId/:filename` route (never as public static content). Replace with S3/GCS in production.
@@ -508,7 +519,7 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `POST /api/vendor-fee-config/resolve` | Calc-engine lookup: exact (vendorId, productCategoryId) match |
 | `POST /api/buyback/:id/diagnosis/initiate` | Start the optional QR-based diagnosis |
 | `GET /api/buyback/:id/diagnosis/status` | Poll diagnosis progress/result |
-| `POST /api/buyback/:id/finalize-value` | Apply the no-diagnosis value drop |
+| `POST /api/buyback/:id/finalize-value` | Apply the no-diagnosis fixed deduction (`NO_DIAGNOSIS_FIXED_DEDUCTION`, default 6000) - does not change `allocatedVendorId` |
 | `POST /api/buyback/:id/customer` | Submit name/email/mobile, sends confirmation OTP |
 | `POST /api/buyback/:id/customer/verify-otp` | Verify the confirmation OTP |
 | `POST /api/buyback/:id/documents` | Upload ID/document proof image |

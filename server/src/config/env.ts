@@ -23,7 +23,11 @@ export const env = {
 
   diagnosisCompleteAfterPolls: Number(process.env.DIAGNOSIS_COMPLETE_AFTER_POLLS ?? 3),
 
-  noDiagnosisValueDropPercent: Number(process.env.NO_DIAGNOSIS_VALUE_DROP_PERCENT ?? 35),
+  /** Fixed amount deducted from maxValue when the customer skips the optional diagnosis step (not a percentage). */
+  noDiagnosisFixedDeduction: Number(process.env.NO_DIAGNOSIS_FIXED_DEDUCTION ?? 6000),
+
+  loginOtpTtlMinutes: Number(process.env.LOGIN_OTP_TTL_MINUTES ?? 5),
+  confirmationOtpTtlMinutes: Number(process.env.CONFIRMATION_OTP_TTL_MINUTES ?? 2),
 
   dataDriver: process.env.DATA_DRIVER ?? 'in-memory',
 

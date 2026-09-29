@@ -13,9 +13,14 @@ import { nextId } from '../utils/idGenerator';
 import { signToken } from '../utils/jwt';
 import { notificationService } from './notification.service';
 
-const OTP_TTL_MS = 5 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_VERIFY_ATTEMPTS = 5;
+
+/** Staff login OTPs and the customer buyback-confirmation OTP have separate, independently configurable expiries. */
+function otpTtlMsFor(purpose: OtpChallenge['purpose']): number {
+  const minutes = purpose === 'login' ? env.loginOtpTtlMinutes : env.confirmationOtpTtlMinutes;
+  return minutes * 60 * 1000;
+}
 
 async function getActiveRoles(userId: number): Promise<Role[]> {
   const assignments = await userRoleRepository.listByUser(userId);
@@ -44,6 +49,7 @@ export const authService = {
       }
     }
 
+    const ttlMinutes = purpose === 'login' ? env.loginOtpTtlMinutes : env.confirmationOtpTtlMinutes;
     const requestId = uuid();
     const challenge: OtpChallenge = {
       requestId,
@@ -51,12 +57,12 @@ export const authService = {
       code: env.mockOtpCode,
       purpose,
       buybackId,
-      expiresAt: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+      expiresAt: new Date(Date.now() + otpTtlMsFor(purpose)).toISOString(),
       verified: false,
       attempts: 0,
     };
     await otpRepository.create(challenge);
-    await notificationService.sendSms(mobile, `Your buyback OTP is ${challenge.code}. Valid for 5 minutes.`);
+    await notificationService.sendSms(mobile, `Your buyback OTP is ${challenge.code}. Valid for ${ttlMinutes} minutes.`);
 
     return {
       requestId,

@@ -1,4 +1,5 @@
 import { NextFunction, Response, Router } from 'express';
+import { REQUEST_STATUS_AMOUNT_CALCULATED_ID, REQUEST_STATUS_BUYBACK_ACCEPTED_ID } from '../data/requestStatus.seed';
 import { catalogRepository, buybackRepository, buybackStatusHistoryRepository, buybackVendorCalculationLogRepository, partnerLocationRepository, questionnaireConfigRepository, userRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { requireRight } from '../middleware/rights.middleware';
@@ -381,12 +382,17 @@ buybackRouter.post('/:id/finalize-value', async (req: AuthedRequest, res, next) 
       return res.status(400).json({ error: 'Use /diagnosis/initiate then poll /diagnosis/status for the diagnosis path' });
     }
 
+    // Fixed deduction only - the allocated vendor from the calculate/allocate
+    // phase never changes here, only the customer-facing final number does.
     const finalValue = applyNoDiagnosisDrop(request.maxValue);
     const updated = await buybackRepository.update(request.id, {
       withDiagnosis: false,
       finalValue,
       status: 'value_finalized',
     });
+    // Re-affirm "Amount Calculated" now that the final (post-no-diagnosis-drop)
+    // amount is known, distinct from the earlier allocate-phase entry.
+    await buybackEngine.recordStatusTransition(request.id, REQUEST_STATUS_AMOUNT_CALCULATED_ID, req.auth!.userId);
     return res.json(updated);
   } catch (err) {
     return next(err);
@@ -461,7 +467,9 @@ buybackRouter.post('/:id/customer/verify-otp', async (req: AuthedRequest, res, n
     const updated = await buybackRepository.update(request.id, {
       customerOtp: { ...request.customerOtp, verified: true },
       status: 'otp_verified',
+      requestStatusId: REQUEST_STATUS_BUYBACK_ACCEPTED_ID,
     });
+    await buybackEngine.recordStatusTransition(request.id, REQUEST_STATUS_BUYBACK_ACCEPTED_ID, req.auth!.userId);
     return res.json(updated);
   } catch (err) {
     return next(err);

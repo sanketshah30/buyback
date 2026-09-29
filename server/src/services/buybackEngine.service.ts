@@ -21,7 +21,14 @@ import { depreciationService } from './depreciation.service';
  * the live flow calls today.
  */
 
-async function recordStatus(buybackRequestId: number, requestStatusId: number, changedByUserId: number): Promise<void> {
+/**
+ * Appends one row to `buyback_status_history` - exported so routes can log
+ * additional transitions outside the register/allocate phases below (e.g.
+ * re-affirming "Amount Calculated" once the no-diagnosis final value is
+ * set, or advancing to "Buyback Accepted" once the customer's OTP is
+ * verified - see routes/buyback.routes.ts).
+ */
+export async function recordStatusTransition(buybackRequestId: number, requestStatusId: number, changedByUserId: number): Promise<void> {
   const now = new Date().toISOString();
   await buybackStatusHistoryRepository.record({
     id: nextId('buyback_status_history'),
@@ -48,7 +55,7 @@ export async function register(request: BuybackRequest, partnerLocationId: numbe
     partnerLocationId,
     requestStatusId: REQUEST_STATUS_CREATED_ID,
   });
-  await recordStatus(request.id, REQUEST_STATUS_CREATED_ID, changedByUserId);
+  await recordStatusTransition(request.id, REQUEST_STATUS_CREATED_ID, changedByUserId);
   return updated;
 }
 
@@ -179,6 +186,6 @@ export async function allocate(
     requestStatusId: REQUEST_STATUS_AMOUNT_CALCULATED_ID,
     status: 'valuation_ready',
   });
-  await recordStatus(request.id, REQUEST_STATUS_AMOUNT_CALCULATED_ID, changedByUserId);
+  await recordStatusTransition(request.id, REQUEST_STATUS_AMOUNT_CALCULATED_ID, changedByUserId);
   return updated;
 }
