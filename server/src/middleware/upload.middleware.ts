@@ -1,10 +1,27 @@
 import fs from 'fs';
 import multer, { FileFilterCallback } from 'multer';
+import os from 'os';
 import path from 'path';
 import { Request } from 'express';
 
-export const uploadsRootDir = path.resolve(__dirname, '../../uploads');
-fs.mkdirSync(uploadsRootDir, { recursive: true });
+/**
+ * On Vercel (and most serverless platforms), the deployed function bundle
+ * itself is a read-only filesystem - only `os.tmpdir()` (`/tmp`) is
+ * writable, and even that is ephemeral per invocation/container, so
+ * uploaded files (documents, product images, generated receipt PDFs)
+ * won't reliably survive to be downloaded in a later request. This keeps
+ * local dev working exactly as before while at least avoiding a hard
+ * crash on `mkdirSync` in production - see server/README.md's "Deploying
+ * to Vercel" section for why real object storage (S3/Vercel Blob/etc.) is
+ * required for uploads to actually work once deployed there.
+ */
+export const uploadsRootDir = process.env.VERCEL ? path.join(os.tmpdir(), 'buyback-uploads') : path.resolve(__dirname, '../../uploads');
+try {
+  fs.mkdirSync(uploadsRootDir, { recursive: true });
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.error(`[upload.middleware] Could not create uploads directory at ${uploadsRootDir}:`, err);
+}
 
 const ALLOWED_MIME_PREFIXES = ['image/', 'video/'];
 // Defense in depth alongside the MIME check - some browsers/clients report a
@@ -38,7 +55,12 @@ const storage = multer.diskStorage({
       return;
     }
     const dir = path.join(uploadsRootDir, buybackId);
-    fs.mkdirSync(dir, { recursive: true });
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (err) {
+      cb(err instanceof Error ? err : new Error('Could not create upload directory'), '');
+      return;
+    }
     cb(null, dir);
   },
   filename: (_req, file, cb) => {
