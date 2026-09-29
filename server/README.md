@@ -38,6 +38,7 @@ src/
   utils/idGenerator.ts     Auto-increment integer ID generator (every table's PK)
   utils/parseId.ts         Validates/coerces a route param or body value into a positive integer PK
   app.ts / index.ts        Express app wiring + bootstrap
+  api/index.ts             Vercel serverless entrypoint - see "Deploying to Vercel" below
 ```
 
 ## Swapping in a real database
@@ -47,6 +48,51 @@ src/
 3. Wire the new implementations into `src/repositories/index.ts` behind that flag.
 
 No route or service code needs to change - they only depend on the repository interfaces.
+
+## Deploying to Vercel
+
+This repo deploys as **two separate Vercel projects** - one for `frontend/`, one for
+`server/` - on two different domains (e.g. `https://buyback-frontend.vercel.app` and
+`https://server-sand-two-38.vercel.app`). Since they're different origins, the frontend
+can't just call a relative `/api/...` path (that resolves to *its own* domain, which has
+no backend behind it - a 404) - see `frontend/README.md`'s "Deploying to Vercel" section
+for the frontend side of this. On this server project:
+
+1. **`server/api/index.ts` + `server/vercel.json`** are what make Express work as a Vercel
+   serverless function at all - `src/index.ts`'s plain `app.listen()` is only for local dev
+   / a traditional long-running Node process and is never invoked by Vercel.
+   `server/vercel.json` rewrites every request to that one function (there's no static
+   content on this project to route around); Express still sees the original incoming
+   path (e.g. `/api/health`) since every route in `src/app.ts` is mounted under that
+   prefix already.
+2. **Set these environment variables on the Vercel project** (Project Settings ->
+   Environment Variables, for the Production environment) before/after your first deploy,
+   then redeploy:
+   - `CLIENT_ORIGIN` = your frontend's exact deployed origin (e.g.
+     `https://buyback-frontend.vercel.app`, no trailing slash) - `NODE_ENV=production` (set
+     automatically by Vercel) makes CORS require an exact match against this, unlike local
+     dev's reflect-any-origin behavior (see `src/app.ts`).
+   - `JWT_SECRET` = a real random secret (not the insecure MVP default).
+   - `MOCK_OTP_EXPOSE_IN_RESPONSE` = `false`.
+   - `MOCK_OTP_CODE` = any non-empty value (still just a fixed mock code - there's no real
+     SMS/email gateway wired up yet, see "Authentication, sessions & role-based access"
+     below - but `assertProductionSafety()` in `src/config/env.ts` refuses to boot in
+     production without *something* set here, as a guardrail against silently shipping the
+     publicly-documented default `123456`).
+   - Without all four set, `assertProductionSafety()` throws at cold start, which surfaces
+     to callers as a generic `500 FUNCTION_INVOCATION_FAILED` with no further detail in the
+     response - check the Vercel function's runtime logs for the actual thrown message.
+3. **File uploads (document proofs, product images, generated receipt PDFs) are stored on
+   local disk in this MVP** (`src/middleware/upload.middleware.ts`), which does not work
+   reliably on Vercel: the deployed function bundle's own filesystem is read-only, and even
+   the one writable directory (`os.tmpdir()`, which this middleware automatically switches
+   to when `process.env.VERCEL` is set) is ephemeral per invocation/container - a file
+   written by one request is not guaranteed to still be there for a later request that
+   tries to read it back (e.g. downloading a receipt, or the calculate phase never touching
+   this at all but confirm's receipt generation + later `GET /api/uploads/...` would be
+   affected). This is enough to avoid a hard crash, but **uploads will not durably persist
+   until this is swapped for real object storage** (S3, Vercel Blob, etc.) behind the same
+   `UploadRepository`-shaped interface - out of scope for this MVP pass.
 
 ## Primary keys & indexing
 
