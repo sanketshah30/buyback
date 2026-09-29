@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   otp_verified: 'OTP verified',
   document_uploaded: 'Document uploaded',
   product_images_uploaded: 'Images uploaded',
-  confirmed: 'Confirmed',
+  completed: 'Completed',
 };
 
 const RESUME_ROUTE: Record<string, (id: string) => string> = {
@@ -52,7 +52,7 @@ export function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const confirmed = history.filter((h) => h.status === 'confirmed');
+  const completed = history.filter((h) => h.status === 'completed');
   const inProgress = history.filter((h) => h.status in RESUME_ROUTE);
 
   const handleStartNewBuyback = () => {
@@ -109,11 +109,11 @@ export function DashboardPage() {
       {!loading && (
         <section>
           <h3 className="dashboard-section-title">History</h3>
-          {confirmed.length === 0 ? (
-            <Banner tone="info">Your confirmed buyback requests will show up here.</Banner>
+          {completed.length === 0 ? (
+            <Banner tone="info">Your completed buyback requests will show up here.</Banner>
           ) : (
             <div className="dashboard-list">
-              {confirmed.map((request) => (
+              {completed.map((request) => (
                 <Card key={request.id}>
                   <div className="dashboard-list__row">
                     <div>

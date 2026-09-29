@@ -52,7 +52,7 @@ export function ReviewPage() {
         <>
           {error && <Banner tone="error">{error}</Banner>}
           <Button onClick={handleConfirm} loading={submitting}>
-            Confirm buyback
+            Complete buyback
           </Button>
         </>
       }

@@ -74,7 +74,7 @@ export type BuybackStatus =
   | 'otp_verified'
   | 'document_uploaded'
   | 'product_images_uploaded'
-  | 'confirmed';
+  | 'completed';
 
 export type DiagnosisStatus = 'not_started' | 'pending' | 'in_progress' | 'completed';
 
@@ -135,7 +135,7 @@ export interface BuybackRequest {
   productImageUrls?: string[];
   createdAt: string;
   updatedAt: string;
-  confirmedAt?: string;
+  completedAt?: string;
 }
 
 export interface User {

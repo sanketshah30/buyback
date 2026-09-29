@@ -110,7 +110,7 @@ export type BuybackStatus =
   | 'otp_verified'
   | 'document_uploaded'
   | 'product_images_uploaded'
-  | 'confirmed';
+  | 'completed';
 
 export type DiagnosisStatus = 'not_started' | 'pending' | 'in_progress' | 'completed';
 
@@ -144,13 +144,16 @@ export interface CustomerInfo {
  * always looked up per user).
  *
  * `status` (the original string enum) keeps tracking the live wizard's
- * granular UI-flow steps (draft, device_captured, ..., confirmed) - it
+ * granular UI-flow steps (draft, device_captured, ..., completed) - it
  * isn't replaced. `requestStatusId` is a separate, additive field: the
  * formal business-lifecycle status from `request_status_master`, only
- * ever set to one of that table's 12 rows, starting with "Request
- * Created" at registration and "Amount Calculated" once allocation
- * finishes (see `buybackEngine.service.ts`) - later phases will wire the
- * rest of the master list (diagnosis, logistics, payout) into it.
+ * ever set to one of that table's 12 rows - "Request Created" at
+ * registration, "Amount Calculated" once allocation finishes (see
+ * `buybackEngine.service.ts`), "Buyback Accepted" once the customer's OTP
+ * verifies, and "Buyback Completed" once `/confirm` runs (there is no
+ * separate "confirmed" business status - it's the same milestone as
+ * "Buyback Accepted") - later phases will wire the rest of the master list
+ * (diagnosis, logistics, payout) into it.
  */
 export interface BuybackRequest {
   id: number;
@@ -202,7 +205,7 @@ export interface BuybackRequest {
   productImageUrls?: string[];
   createdAt: string;
   updatedAt: string;
-  confirmedAt?: string;
+  completedAt?: string;
 }
 
 /**

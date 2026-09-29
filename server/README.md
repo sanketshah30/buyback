@@ -379,6 +379,11 @@ the same `recordStatusTransition()` helper:
 - `POST /api/buyback/:id/customer/verify-otp`, once the customer's confirmation OTP
   verifies successfully, advances `requestStatusId` to `5` ("Buyback Accepted") and logs
   that transition too.
+- `POST /api/buyback/:id/confirm` (the Review page's final step) advances `requestStatusId`
+  straight to `6` ("Buyback Completed") and logs that transition. There is deliberately no
+  separate "confirmed" business status in between - that milestone is already covered by
+  "Buyback Accepted" above, so the legacy `status` string field's final value is
+  `'completed'` (renamed from the earlier `'confirmed'`), not a distinct `'confirmed'` step.
 
 ```
 buyback_requests ──1:N──▶ buyback_vendor_calculation_log ──▶ partners (vendor)
@@ -394,7 +399,7 @@ partner_locations (0 = wildcard) ──┘       product_categories ──┘
 
 | Table | Description | Foreign keys |
 | --- | --- | --- |
-| `request_status_master` | The full formal buyback lifecycle (12 rows, in `sequence` order) - "Request Created", "Amount Calculated", and "Buyback Accepted" are wired into the live flow so far; the rest (diagnosis, remaining logistics, payout) are seeded for upcoming phases | - |
+| `request_status_master` | The full formal buyback lifecycle (12 rows, in `sequence` order) - "Request Created", "Amount Calculated", "Buyback Accepted", and "Buyback Completed" are wired into the live flow so far; the rest (diagnosis, remaining logistics, payout) are seeded for upcoming phases | - |
 | `buyback_status_history` | Append-only log of every `requestStatusId` transition a request goes through | `buybackRequestId` → buyback_requests.id, `requestStatusId` → request_status_master.id, `changedByUserId` → users.id |
 | `buyback_vendor_calculation_log` | One row per (buyback request, evaluated vendor) from the calculate phase - `skuPrice`, `totalDepreciationAmount`, and the final `buybackValue` (the Retailer value) are all stored, not just the final number, for full auditability | `buybackRequestId` → buyback_requests.id, `vendorId` → partners.id, `skuPricingId` → sku_pricing.id, `depreciationConfigId` → depreciation_config.id (nullable - a vendor may have no depreciation set configured at all, treated as zero deduction) |
 | `partner_margin_config` | The retail partner's commission %, deducted from Retailer value to get Customer value. `partnerLocationId` is a **literal, non-nullable `0` sentinel** ("applies to all of this partner's locations") - a deliberate departure from this codebase's usual `null`-wildcard convention, since it was specified that way; an exact location match still wins over the `0` row when both exist | `partnerId` → partners.id, `partnerLocationId` → partner_locations.id (or literal `0`), `productCategoryId` → product_categories.id |
@@ -414,7 +419,7 @@ registered), `partnerLocationId`, `allocatedVendorId` (renamed from the earlier
 placeholder's `selectedVendorId`), and the three captured values: `retailerValue`,
 `customerValue`, `vendorPayable` (`maxValue` mirrors `customerValue`, per above). Its
 original `status` string field is untouched and keeps tracking the live wizard's granular
-UI-flow steps (`draft`, `device_captured`, ..., `confirmed`) - `requestStatusId` is a
+UI-flow steps (`draft`, `device_captured`, ..., `completed`) - `requestStatusId` is a
 separate, additive, more formal lifecycle status, per an explicit scoping decision to keep
 the two independent for now.
 
@@ -524,7 +529,7 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `POST /api/buyback/:id/customer/verify-otp` | Verify the confirmation OTP |
 | `POST /api/buyback/:id/documents` | Upload ID/document proof image |
 | `POST /api/buyback/:id/product-images` | Upload 6-side images (only required for the questionnaire path; enforced again at confirm time) |
-| `POST /api/buyback/:id/confirm` | Confirm the buyback - moves it into history |
+| `POST /api/buyback/:id/confirm` | Finish the buyback - sets `requestStatusId = 6` ("Buyback Completed") and moves it into history |
 | `GET /api/uploads/:buybackId/:filename` | Fetch an uploaded file - requires auth + ownership of that buyback |
 | `POST /api/partners` | Create a partner |
 | `PATCH /api/partners/:id` | Update a partner |

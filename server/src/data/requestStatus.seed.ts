@@ -6,9 +6,13 @@ const audit = { createdAt: SEEDED_AT, updatedAt: SEEDED_AT, isActive: true };
 
 /**
  * Table: request_status_master
- * The full formal buyback lifecycle. Only ids 1 ("Request Created") and 2
- * ("Amount Calculated") are wired into the live flow so far - see the
- * `RequestStatusMaster` doc comment in types/domain.ts.
+ * The full formal buyback lifecycle. Ids 1 ("Request Created"), 2 ("Amount
+ * Calculated"), 5 ("Buyback Accepted") and 6 ("Buyback Completed") are wired
+ * into the live flow so far - see the `RequestStatusMaster` doc comment in
+ * types/domain.ts. There is deliberately no separate "confirmed" status:
+ * that concept is already covered by "Buyback Accepted" (set once the
+ * customer's OTP verifies), so the final `/confirm` step goes straight to
+ * "Buyback Completed" instead.
  */
 export const requestStatuses: RequestStatusMaster[] = [
   { id: 1, name: 'Request Created', sequence: 1, ...audit },
@@ -27,5 +31,6 @@ export const requestStatuses: RequestStatusMaster[] = [
 export const REQUEST_STATUS_CREATED_ID = 1;
 export const REQUEST_STATUS_AMOUNT_CALCULATED_ID = 2;
 export const REQUEST_STATUS_BUYBACK_ACCEPTED_ID = 5;
+export const REQUEST_STATUS_COMPLETED_ID = 6;
 
 reserveIdRange('request_status_master', requestStatuses.length);

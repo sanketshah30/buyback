@@ -12,7 +12,7 @@ export function SuccessPage() {
     <PageShell showBack={false}>
       <div className="value-hero" style={{ paddingTop: 60 }}>
         <span style={{ fontSize: '3rem' }}>🎉</span>
-        <h1 style={{ marginTop: 12 }}>Buyback confirmed!</h1>
+        <h1 style={{ marginTop: 12 }}>Buyback completed!</h1>
         <p style={{ marginTop: 8 }}>
           Your request <strong style={{ color: 'var(--color-gold)' }}>{data?.referenceId}</strong> has been received.
           Our team will reach out with pickup/drop-off details.

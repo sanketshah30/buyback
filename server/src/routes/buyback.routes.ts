@@ -1,5 +1,5 @@
 import { NextFunction, Response, Router } from 'express';
-import { REQUEST_STATUS_AMOUNT_CALCULATED_ID, REQUEST_STATUS_BUYBACK_ACCEPTED_ID } from '../data/requestStatus.seed';
+import { REQUEST_STATUS_AMOUNT_CALCULATED_ID, REQUEST_STATUS_BUYBACK_ACCEPTED_ID, REQUEST_STATUS_COMPLETED_ID } from '../data/requestStatus.seed';
 import { catalogRepository, buybackRepository, buybackStatusHistoryRepository, buybackVendorCalculationLogRepository, partnerLocationRepository, questionnaireConfigRepository, userRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { requireRight } from '../middleware/rights.middleware';
@@ -531,11 +531,17 @@ buybackRouter.post('/:id/confirm', async (req: AuthedRequest, res, next) => {
       return res.status(400).json({ error: '6-side product images are required for the questionnaire assessment path' });
     }
 
+    // There is no separate "confirmed" business status - the customer already
+    // hit that milestone at "Buyback Accepted" (OTP verification). This is
+    // the whole flow's final step, so it goes straight to "Buyback
+    // Completed" on both the legacy status field and requestStatusId.
     const now = new Date().toISOString();
     const updated = await buybackRepository.update(request.id, {
-      status: 'confirmed',
-      confirmedAt: now,
+      status: 'completed',
+      completedAt: now,
+      requestStatusId: REQUEST_STATUS_COMPLETED_ID,
     });
+    await buybackEngine.recordStatusTransition(request.id, REQUEST_STATUS_COMPLETED_ID, req.auth!.userId);
     return res.json(updated);
   } catch (err) {
     return next(err);
