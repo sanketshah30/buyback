@@ -1,7 +1,18 @@
 // Empty string = relative requests, which go through the Vite dev/preview
 // server proxy (see vite.config.ts) so the app always calls the API on the
 // same origin the page was loaded from.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+//
+// Strip any trailing slash(es) - every call site below appends a path that
+// already starts with "/" (e.g. "/api/auth/otp/request"), so a value like
+// "https://my-backend.vercel.app/" (very easy to paste with the trailing
+// slash still on it, since that's exactly how it looks in a browser
+// address bar) would otherwise produce a double-slash URL
+// ("https://my-backend.vercel.app//api/..."). That's not just cosmetic -
+// on Vercel in particular, a double-slash path can fail to route to the
+// backend function at all, and the resulting non-CORS-aware error response
+// (a 404/redirect with no Access-Control-Allow-Origin header) is what the
+// browser reports as a generic, misleading "CORS error".
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 const TOKEN_STORAGE_KEY = 'buyback.token';
 
 /**
