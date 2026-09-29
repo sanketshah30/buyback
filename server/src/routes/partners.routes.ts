@@ -58,6 +58,7 @@ partnersRouter.post('/', async (req, res, next) => {
       country: body.country!,
       partnerType: body.partnerType!,
       uniqueIdentifier: body.uniqueIdentifier!,
+      email: body.email,
       createdAt: now,
       updatedAt: now,
       isActive: true,

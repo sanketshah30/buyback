@@ -50,4 +50,5 @@ export const buybackApi = {
     return api.upload<BuybackRequest>(`/api/buyback/${id}/product-images`, form);
   },
   confirm: (id: string) => api.post<BuybackRequest>(`/api/buyback/${id}/confirm`),
+  cancel: (id: string) => api.post<BuybackRequest>(`/api/buyback/${id}/cancel`),
 };

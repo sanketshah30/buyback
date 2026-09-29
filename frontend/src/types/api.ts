@@ -74,7 +74,8 @@ export type BuybackStatus =
   | 'otp_verified'
   | 'document_uploaded'
   | 'product_images_uploaded'
-  | 'completed';
+  | 'completed'
+  | 'cancelled';
 
 export type DiagnosisStatus = 'not_started' | 'pending' | 'in_progress' | 'completed';
 

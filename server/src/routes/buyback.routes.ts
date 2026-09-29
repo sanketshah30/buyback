@@ -1,6 +1,6 @@
 import { NextFunction, Response, Router } from 'express';
-import { REQUEST_STATUS_AMOUNT_CALCULATED_ID, REQUEST_STATUS_BUYBACK_ACCEPTED_ID, REQUEST_STATUS_COMPLETED_ID } from '../data/requestStatus.seed';
-import { catalogRepository, buybackRepository, buybackStatusHistoryRepository, buybackVendorCalculationLogRepository, partnerLocationRepository, questionnaireConfigRepository, userRepository } from '../repositories';
+import { REQUEST_STATUS_AMOUNT_CALCULATED_ID, REQUEST_STATUS_BUYBACK_ACCEPTED_ID, REQUEST_STATUS_CANCELLED_ID, REQUEST_STATUS_COMPLETED_ID } from '../data/requestStatus.seed';
+import { catalogRepository, buybackRepository, buybackStatusHistoryRepository, buybackVendorCalculationLogRepository, partnerLocationRepository, partnerRepository, questionnaireConfigRepository, userRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { requireRight } from '../middleware/rights.middleware';
 import { toPublicUrl, upload } from '../middleware/upload.middleware';
@@ -9,6 +9,7 @@ import { assessmentService } from '../services/assessment.service';
 import { authService } from '../services/auth.service';
 import * as buybackEngine from '../services/buybackEngine.service';
 import { diagnosisService } from '../services/diagnosis.service';
+import { emailService } from '../services/email.service';
 import { notificationService } from '../services/notification.service';
 import { applyDiagnosisAdjustment, applyNoDiagnosisDrop } from '../services/valuation.service';
 import { BuybackRequest, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
@@ -415,8 +416,9 @@ buybackRouter.post('/:id/customer', async (req: AuthedRequest, res, next) => {
       status: 'customer_info_pending',
     });
 
-    const otp = await authService.requestOtp(mobile, 'buyback-confirmation', request.id);
-    await notificationService.sendEmail(email, 'Your buyback OTP', `Your OTP is ${otp.devOtp ?? '******'}.`);
+    // requestOtp() itself emails the real OTP code (see auth.service.ts /
+    // email.service.ts's sendOtpEmail) - independent of MOCK_OTP_EXPOSE_IN_RESPONSE.
+    const otp = await authService.requestOtp(mobile, 'buyback-confirmation', request.id, email);
 
     const updated = await buybackRepository.update(request.id, {
       customerOtp: { requestId: otp.requestId, verified: false },
@@ -434,15 +436,16 @@ buybackRouter.post('/:id/customer/resend-otp', async (req: AuthedRequest, res, n
     const { channel } = req.body as { channel?: 'sms' | 'call' };
     if (!request.customer) return res.status(400).json({ error: 'Customer details have not been submitted yet' });
 
-    const otp = await authService.requestOtp(request.customer.mobile, 'buyback-confirmation', request.id);
+    // Email is always (re-)sent regardless of channel - see requestOtp() /
+    // email.service.ts's sendOtpEmail. "call" additionally triggers a mock
+    // voice call over SMS on top of that.
+    const otp = await authService.requestOtp(request.customer.mobile, 'buyback-confirmation', request.id, request.customer.email);
 
     if (channel === 'call') {
       await notificationService.sendSms(
         request.customer.mobile,
         `[mock voice call] Your buyback OTP is ${otp.devOtp ?? '******'}.`,
       );
-    } else {
-      await notificationService.sendEmail(request.customer.email, 'Your buyback OTP', `Your OTP is ${otp.devOtp ?? '******'}.`);
     }
 
     const updated = await buybackRepository.update(request.id, {
@@ -533,8 +536,8 @@ buybackRouter.post('/:id/confirm', async (req: AuthedRequest, res, next) => {
 
     // There is no separate "confirmed" business status - the customer already
     // hit that milestone at "Buyback Accepted" (OTP verification). This is
-    // the whole flow's final step, so it goes straight to "Buyback
-    // Completed" on both the legacy status field and requestStatusId.
+    // the whole flow's final step, so it goes straight to "Completed" on
+    // both the legacy status field and requestStatusId.
     const now = new Date().toISOString();
     const updated = await buybackRepository.update(request.id, {
       status: 'completed',
@@ -542,6 +545,43 @@ buybackRouter.post('/:id/confirm', async (req: AuthedRequest, res, next) => {
       requestStatusId: REQUEST_STATUS_COMPLETED_ID,
     });
     await buybackEngine.recordStatusTransition(request.id, REQUEST_STATUS_COMPLETED_ID, req.auth!.userId);
+
+    // Email communication module (see services/email.service.ts): the
+    // customer gets a completion email, and the vendor that was allocated
+    // this device gets told a payment is due before it ships to them.
+    await emailService.sendBuybackCompletedEmail(updated);
+    if (updated.allocatedVendorId !== undefined) {
+      const vendor = await partnerRepository.findById(updated.allocatedVendorId);
+      if (vendor) await emailService.sendVendorAllocationEmail(vendor, updated);
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+/**
+ * Cancels a buyback that hasn't already completed - see "Email
+ * communication module" in server/README.md for the cancellation email
+ * this triggers.
+ */
+buybackRouter.post('/:id/cancel', async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    if (request.requestStatusId === REQUEST_STATUS_COMPLETED_ID) {
+      return res.status(400).json({ error: 'A completed buyback cannot be cancelled' });
+    }
+    if (request.requestStatusId === REQUEST_STATUS_CANCELLED_ID) {
+      return res.status(400).json({ error: 'This buyback is already cancelled' });
+    }
+
+    const updated = await buybackRepository.update(request.id, {
+      status: 'cancelled',
+      requestStatusId: REQUEST_STATUS_CANCELLED_ID,
+    });
+    await buybackEngine.recordStatusTransition(request.id, REQUEST_STATUS_CANCELLED_ID, req.auth!.userId);
+    await emailService.sendBuybackCancelledEmail(updated);
     return res.json(updated);
   } catch (err) {
     return next(err);

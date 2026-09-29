@@ -11,6 +11,7 @@ import {
 import { OtpChallenge, Role } from '../types/domain';
 import { nextId } from '../utils/idGenerator';
 import { signToken } from '../utils/jwt';
+import { emailService } from './email.service';
 import { notificationService } from './notification.service';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -37,7 +38,7 @@ export const authService = {
    * `purpose === 'login'`; the buyback-confirmation OTP a *customer* gets
    * (an unrelated mobile number, never a `User` row) is unaffected.
    */
-  async requestOtp(mobile: string, purpose: OtpChallenge['purpose'], buybackId?: number) {
+  async requestOtp(mobile: string, purpose: OtpChallenge['purpose'], buybackId?: number, email?: string) {
     if (purpose === 'login') {
       const user = await userRepository.findByMobile(mobile);
       if (!user || !user.isActive) {
@@ -63,6 +64,11 @@ export const authService = {
     };
     await otpRepository.create(challenge);
     await notificationService.sendSms(mobile, `Your buyback OTP is ${challenge.code}. Valid for ${ttlMinutes} minutes.`);
+    // Email always gets the *real* code here, regardless of resend channel or
+    // MOCK_OTP_EXPOSE_IN_RESPONSE - see email.service.ts's sendOtpEmail() doc.
+    if (purpose === 'buyback-confirmation' && email) {
+      await emailService.sendOtpEmail(email, challenge.code, ttlMinutes);
+    }
 
     return {
       requestId,

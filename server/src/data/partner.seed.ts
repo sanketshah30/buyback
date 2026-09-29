@@ -28,6 +28,7 @@ export const partners: Partner[] = [
     country: 'USA',
     partnerType: 'vendor',
     uniqueIdentifier: 'VND-GOLDIE-001',
+    email: 'payments@goldiegroup.example.com',
     ...audit,
   },
   {
@@ -40,6 +41,7 @@ export const partners: Partner[] = [
     country: 'USA',
     partnerType: 'vendor',
     uniqueIdentifier: 'VND-QUICKCASH-001',
+    email: 'payments@quickcashtrading.example.com',
     ...audit,
   },
 ];
