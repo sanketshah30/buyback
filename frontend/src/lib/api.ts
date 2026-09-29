@@ -31,7 +31,8 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+/** Shared by request() and getBlob() below - attaches the auth header and reacts to a dead session the same way regardless of response shape. */
+async function authedFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
   const headers = new Headers(options.headers);
   const isFormData = options.body instanceof FormData;
@@ -41,21 +42,42 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  // Only a request that actually carried a token can mean "session died" -
+  // the OTP request/verify endpoints are unauthenticated and never return
+  // 401 for their own reasons, so this only ever fires for a genuinely dead
+  // session.
+  if (res.status === 401 && token) {
+    setToken(null);
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+  return res;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await authedFetch(path, options);
   const isJson = res.headers.get('content-type')?.includes('application/json');
   const data = isJson ? await res.json().catch(() => undefined) : undefined;
 
   if (!res.ok) {
-    // Only a request that actually carried a token can mean "session died" -
-    // the OTP request/verify endpoints are unauthenticated and never return
-    // 401 for their own reasons, so this only ever fires for a genuinely
-    // dead session.
-    if (res.status === 401 && token) {
-      setToken(null);
-      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
-    }
     throw new ApiError(data?.error ?? res.statusText ?? 'Request failed', res.status);
   }
   return data as T;
+}
+
+/** For binary responses (e.g. the purchase-receipt PDF) that can't be rendered via a plain `<iframe src>` since that wouldn't carry the Authorization header - see pages/buyback/ReceiptPage.tsx. */
+async function getBlob(path: string): Promise<Blob> {
+  const res = await authedFetch(path, { method: 'GET' });
+  if (!res.ok) {
+    let message = res.statusText || 'Request failed';
+    try {
+      const data = await res.json();
+      message = data?.error ?? message;
+    } catch {
+      // Response wasn't JSON (e.g. a plain 404) - keep the status text.
+    }
+    throw new ApiError(message, res.status);
+  }
+  return res.blob();
 }
 
 export const api = {
@@ -66,6 +88,7 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: body instanceof FormData ? body : JSON.stringify(body ?? {}) }),
   upload: <T>(path: string, formData: FormData, method: 'POST' | 'PATCH' = 'POST') =>
     request<T>(path, { method, body: formData }),
+  getBlob,
 };
 
 export function resolveMediaUrl(url?: string): string | undefined {

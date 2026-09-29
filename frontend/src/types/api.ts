@@ -137,6 +137,7 @@ export interface BuybackRequest {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  receiptUrl?: string;
 }
 
 export interface User {

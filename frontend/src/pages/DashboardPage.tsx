@@ -114,12 +114,17 @@ export function DashboardPage() {
           ) : (
             <div className="dashboard-list">
               {completed.map((request) => (
-                <Card key={request.id}>
+                <Card
+                  key={request.id}
+                  interactive={Boolean(request.receiptUrl)}
+                  onClick={request.receiptUrl ? () => navigate(`/buyback/${request.id}/receipt`) : undefined}
+                >
                   <div className="dashboard-list__row">
                     <div>
                       <strong>{request.referenceId}</strong>
                       <p>
                         {request.product?.name} · {request.sku?.label}
+                        {request.receiptUrl ? ' · View receipt' : ''}
                       </p>
                     </div>
                     <span className="dashboard-list__value">₹{request.finalValue}</span>

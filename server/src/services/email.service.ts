@@ -1,4 +1,4 @@
-import { BuybackRequest, Partner } from '../types/domain';
+import { BuybackRequest, Partner, PartnerLocation } from '../types/domain';
 import { notificationService } from './notification.service';
 
 /**
@@ -37,8 +37,14 @@ export const emailService = {
     );
   },
 
-  /** Sent to the customer once POST /api/buyback/:id/confirm advances requestStatusId to "Completed". */
-  async sendBuybackCompletedEmail(request: BuybackRequest): Promise<void> {
+  /**
+   * Sent to the customer once POST /api/buyback/:id/confirm advances
+   * requestStatusId to "Completed" - carries the generated purchase-receipt
+   * PDF (see services/receipt.service.ts) as an attachment, and cc's the
+   * purchasing partner location's own email (if one is on file) so they
+   * have a copy of the same legal proof-of-purchase too.
+   */
+  async sendBuybackCompletedEmail(request: BuybackRequest, receiptFilePath?: string, partnerLocation?: PartnerLocation): Promise<void> {
     const email = request.customer?.email;
     if (!email) return;
     const value = request.finalValue ?? request.maxValue;
@@ -48,7 +54,11 @@ export const emailService = {
       `Your buyback ${reference} is complete`,
       `Good news - your buyback request ${reference} has been completed` +
         (value !== undefined ? ` for a final value of \u20b9${value}.` : '.') +
-        ' Thank you for trading in with us!',
+        (receiptFilePath ? ' Thank you for trading in with us! Your purchase receipt is attached for your records.' : ' Thank you for trading in with us!'),
+      {
+        cc: partnerLocation?.email,
+        attachments: receiptFilePath ? [{ filename: `buyback-receipt-${reference}.pdf`, path: receiptFilePath }] : undefined,
+      },
     );
   },
 

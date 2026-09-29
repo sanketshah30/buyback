@@ -31,6 +31,8 @@ src/
       indexUtils.ts           <- tiny helper for maintaining a secondary index
       session.repository.ts   <- login sessions (separate from otp_challenges - see README below)
   services/               Business logic (auth/OTP/sessions, valuation, AI-mock assessment, diagnosis, notifications)
+  services/email.service.ts  Templated customer/vendor emails - see "Email communication module"
+  services/receipt.service.ts  Purchase-receipt PDF generation (pdfkit) - see "Purchase receipt module"
   middleware/              Auth guard, role/rights guard, file upload (multer), error handling
   routes/                  Express routers: auth, catalog, buyback, partners, users, questions, ...
   utils/idGenerator.ts     Auto-increment integer ID generator (every table's PK)
@@ -449,6 +451,34 @@ captured) - a missing email should never block the underlying buyback action. `P
 gained an optional `email` field (contact/notification email) for #3; only the two seeded
 vendors (Goldie Group, QuickCash Trading) have one set.
 
+### Purchase receipt module
+
+`services/receipt.service.ts` generates a legal purchase-receipt PDF (via `pdfkit`) the
+moment a buyback completes - proof that the partner location bought the device from the
+named customer. It's triggered from inside `POST /api/buyback/:id/confirm`, right after
+`requestStatusId` reaches `6` ("Completed"), and covers:
+
+- Reference/date, the purchasing partner location's name + address
+- Customer name, mobile, email
+- Product category/brand/name, SKU, and IMEI/serial number
+- The buyback value paid to the customer (`finalValue`, falling back to `customerValue`/`maxValue`)
+
+The PDF is written to the same per-buyback uploads folder as document/product-image
+uploads (`uploads/<buybackId>/receipt.pdf`), so it's served by the existing
+`GET /api/uploads/:buybackId/:filename` route with no new endpoint - just a `.pdf`
+content-type mapping added there. `BuybackRequest.receiptUrl` points at it once generated.
+It's then:
+
+- **Emailed to the customer**, attached to the "buyback completed" email (#2 above), **cc'd
+  to the purchasing partner location's own email** if one is on file - `PartnerLocation`
+  gained the same optional `email` field as `Partner` for this; only the two seeded BestBuy
+  locations (New York, Dallas) have one set.
+- **Previewable in-app** by the partner: since the uploads route requires the same
+  Bearer-token auth as everything else, the frontend fetches it as a blob (not a plain
+  `<iframe src="...">`, which can't carry an Authorization header) and renders that as an
+  object URL - see `frontend/src/pages/buyback/ReceiptPage.tsx` (`/buyback/:id/receipt`),
+  linked from the Success page and the dashboard's completed-history list.
+
 **The questionnaire assessment step is now backed entirely by the normalized
 questionnaire-config module** (no more hardcoded per-category question/answer codes):
 `POST /api/buyback/:id/assessment/questionnaire` resolves the applicable questionnaire via
@@ -555,7 +585,7 @@ customer's own name/email/mobile is captured later, mid-flow, as `BuybackRequest
 | `POST /api/buyback/:id/customer/verify-otp` | Verify the confirmation OTP |
 | `POST /api/buyback/:id/documents` | Upload ID/document proof image |
 | `POST /api/buyback/:id/product-images` | Upload 6-side images (only required for the questionnaire path; enforced again at confirm time) |
-| `POST /api/buyback/:id/confirm` | Finish the buyback - sets `requestStatusId = 6` ("Completed"), moves it into history, and sends the completion + vendor-allocation emails |
+| `POST /api/buyback/:id/confirm` | Finish the buyback - sets `requestStatusId = 6` ("Completed"), generates the purchase-receipt PDF, moves it into history, and sends the completion (with receipt attached) + vendor-allocation emails |
 | `POST /api/buyback/:id/cancel` | Cancel the buyback (blocked once already completed/cancelled) - sets `requestStatusId = 7` ("Cancelled") and sends the cancellation email |
 | `GET /api/uploads/:buybackId/:filename` | Fetch an uploaded file - requires auth + ownership of that buyback |
 | `POST /api/partners` | Create a partner |

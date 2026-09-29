@@ -19,9 +19,11 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
   '.mov': 'video/quicktime',
   '.webm': 'video/webm',
   '.m4v': 'video/x-m4v',
+  '.pdf': 'application/pdf',
 };
 
-// Uploaded ID documents and device photos are sensitive (PII) and must never
+// Uploaded ID documents, device photos, and generated purchase-receipt PDFs
+// (see services/receipt.service.ts) are all sensitive (PII) and must never
 // be served as public static content - this route requires the same
 // Bearer-token auth as the rest of the API, plus ownership of the specific
 // buyback the file belongs to, before streaming a single file back.

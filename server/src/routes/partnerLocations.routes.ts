@@ -61,6 +61,7 @@ partnerLocationsRouter.post('/', async (req, res, next) => {
       zipCode: body.zipCode!,
       country: body.country!,
       uniqueIdentifier: body.uniqueIdentifier!,
+      email: body.email,
       createdAt: now,
       updatedAt: now,
       isActive: true,

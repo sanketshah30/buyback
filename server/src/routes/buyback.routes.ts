@@ -11,6 +11,7 @@ import * as buybackEngine from '../services/buybackEngine.service';
 import { diagnosisService } from '../services/diagnosis.service';
 import { emailService } from '../services/email.service';
 import { notificationService } from '../services/notification.service';
+import { generatePurchaseReceipt } from '../services/receipt.service';
 import { applyDiagnosisAdjustment, applyNoDiagnosisDrop } from '../services/valuation.service';
 import { BuybackRequest, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
 import { nextId } from '../utils/idGenerator';
@@ -539,17 +540,32 @@ buybackRouter.post('/:id/confirm', async (req: AuthedRequest, res, next) => {
     // the whole flow's final step, so it goes straight to "Completed" on
     // both the legacy status field and requestStatusId.
     const now = new Date().toISOString();
-    const updated = await buybackRepository.update(request.id, {
+    let updated = await buybackRepository.update(request.id, {
       status: 'completed',
       completedAt: now,
       requestStatusId: REQUEST_STATUS_COMPLETED_ID,
     });
     await buybackEngine.recordStatusTransition(request.id, REQUEST_STATUS_COMPLETED_ID, req.auth!.userId);
 
+    // Legal proof-of-purchase PDF (see services/receipt.service.ts) - the
+    // partner location that's on it is the one this request was registered
+    // under (loaded above via `location` in POST /:id/valuation; here we
+    // re-look it up since this is a separate request).
+    const partnerLocation = updated.partnerLocationId !== undefined
+      ? await partnerLocationRepository.findById(updated.partnerLocationId)
+      : undefined;
+    let receiptFilePath: string | undefined;
+    if (partnerLocation) {
+      const receipt = await generatePurchaseReceipt(updated, partnerLocation);
+      updated = await buybackRepository.update(request.id, { receiptUrl: receipt.publicUrl });
+      receiptFilePath = receipt.filePath;
+    }
+
     // Email communication module (see services/email.service.ts): the
-    // customer gets a completion email, and the vendor that was allocated
-    // this device gets told a payment is due before it ships to them.
-    await emailService.sendBuybackCompletedEmail(updated);
+    // customer gets the receipt attached to their completion email (cc'd
+    // to the partner location), and the allocated vendor is told a
+    // payment is due before the device ships to them.
+    await emailService.sendBuybackCompletedEmail(updated, receiptFilePath, partnerLocation);
     if (updated.allocatedVendorId !== undefined) {
       const vendor = await partnerRepository.findById(updated.allocatedVendorId);
       if (vendor) await emailService.sendVendorAllocationEmail(vendor, updated);

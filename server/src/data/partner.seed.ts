@@ -61,6 +61,7 @@ export const partnerLocations: PartnerLocation[] = [
     zipCode: '10017',
     country: 'USA',
     uniqueIdentifier: 'LOC-BESTBUY-NYC',
+    email: 'nyc.store@bestbuy.example.com',
     ...audit,
   },
   {
@@ -73,6 +74,7 @@ export const partnerLocations: PartnerLocation[] = [
     zipCode: '75230',
     country: 'USA',
     uniqueIdentifier: 'LOC-BESTBUY-DAL',
+    email: 'dallas.store@bestbuy.example.com',
     ...audit,
   },
   {

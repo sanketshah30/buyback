@@ -17,6 +17,7 @@ import { CustomerInfoPage } from './pages/buyback/CustomerInfoPage';
 import { DocumentProofPage } from './pages/buyback/DocumentProofPage';
 import { ReviewPage } from './pages/buyback/ReviewPage';
 import { SuccessPage } from './pages/buyback/SuccessPage';
+import { ReceiptPage } from './pages/buyback/ReceiptPage';
 
 function App() {
   return (
@@ -133,6 +134,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SuccessPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyback/:id/receipt"
+              element={
+                <ProtectedRoute>
+                  <ReceiptPage />
                 </ProtectedRoute>
               }
             />

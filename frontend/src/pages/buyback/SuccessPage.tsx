@@ -25,7 +25,12 @@ export function SuccessPage() {
         )}
       </div>
 
-      <div style={{ marginTop: 'auto' }}>
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {data?.receiptUrl && (
+          <Button variant="secondary" onClick={() => navigate(`/buyback/${id}/receipt`)}>
+            View purchase receipt
+          </Button>
+        )}
         <Button onClick={() => navigate('/')}>Back to home</Button>
       </div>
     </PageShell>

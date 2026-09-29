@@ -204,6 +204,8 @@ export interface BuybackRequest {
   };
   documentProofUrl?: string;
   productImageUrls?: string[];
+  /** The purchase-receipt PDF generated once /confirm completes the buyback - see services/receipt.service.ts. Served the same way as other uploads, via GET /api/uploads/:buybackId/:filename. */
+  receiptUrl?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -268,6 +270,8 @@ export interface PartnerLocation extends BaseEntity {
   country: string;
   /** External/business identifier for this location - unique among active locations. */
   uniqueIdentifier: string;
+  /** Contact email for automated notifications - e.g. gets cc'd the purchase receipt once a buyback registered at this location completes. Optional since not every location needs one yet. */
+  email?: string;
 }
 
 /**
