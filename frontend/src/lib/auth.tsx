@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { authApi } from './authApi';
-import { getToken, setToken } from './api';
+import { getToken, setToken, SESSION_EXPIRED_EVENT } from './api';
 import type { Role, User } from '../types/api';
 
 interface SessionContext {
@@ -17,6 +17,8 @@ interface AuthContextValue extends SessionContext {
   logout: () => Promise<void>;
   /** e.g. `hasRight('process_buyback')` - true if any of the user's roles grants this right. */
   hasRight: (right: string) => boolean;
+  /** True only when the session was force-cleared by a 401 (see SESSION_EXPIRED_EVENT below), never for an explicit logout() - so LoginPage can tell the user why they landed there. Cleared on the next login(). */
+  sessionExpired: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(getToken());
   const [user, setUser] = useState<User | null>(loadStoredUser());
   const [session, setSession] = useState<SessionContext>(loadStoredSession());
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const login = useCallback((newToken: string, newUser: User, newSession: SessionContext) => {
     setToken(newToken);
@@ -55,6 +58,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenState(newToken);
     setUser(newUser);
     setSession(newSession);
+    setSessionExpired(false);
+  }, []);
+
+  /** Clears all local session state - shared by an explicit logout() and a forced session-expired logout below. */
+  const clearSession = useCallback(() => {
+    setToken(null);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setTokenState(null);
+    setUser(null);
+    setSession({ partnerId: null, partnerLocationId: null, roles: [] });
   }, []);
 
   const logout = useCallback(async () => {
@@ -64,19 +78,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Best-effort: even if the server call fails (e.g. already expired),
       // still clear local state so the user isn't stuck "logged in".
     }
-    setToken(null);
-    localStorage.removeItem(USER_STORAGE_KEY);
-    localStorage.removeItem(SESSION_STORAGE_KEY);
-    setTokenState(null);
-    setUser(null);
-    setSession({ partnerId: null, partnerLocationId: null, roles: [] });
-  }, []);
+    clearSession();
+  }, [clearSession]);
+
+  // If any API call comes back 401 (session logged out elsewhere, expired,
+  // or revoked - see lib/api.ts's SESSION_EXPIRED_EVENT), clear local state
+  // immediately without another round-trip to /auth/logout (that session is
+  // already dead server-side). `isAuthenticated` flipping to false then
+  // makes every `ProtectedRoute` redirect to /login on its next render -
+  // unlike an explicit logout(), this also flags `sessionExpired` so the
+  // login page can explain why.
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      clearSession();
+      setSessionExpired(true);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [clearSession]);
 
   const hasRight = useCallback((right: string) => session.roles.some((role) => role.rights.includes(right)), [session.roles]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, token, isAuthenticated: Boolean(token), ...session, login, logout, hasRight }),
-    [user, token, session, login, logout, hasRight],
+    () => ({ user, token, isAuthenticated: Boolean(token), ...session, login, logout, hasRight, sessionExpired }),
+    [user, token, session, login, logout, hasRight, sessionExpired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

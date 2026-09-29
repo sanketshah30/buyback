@@ -6,10 +6,12 @@ import { PageShell } from '../components/ui/PageShell';
 import { TextField } from '../components/ui/TextField';
 import { authApi } from '../lib/authApi';
 import { ApiError } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import './LoginPage.css';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { sessionExpired } = useAuth();
   const [mobile, setMobile] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,7 @@ export function LoginPage() {
       </div>
 
       <form className="login-form" onSubmit={handleSubmit}>
+        {sessionExpired && <Banner tone="info">Your session has ended. Please log in again.</Banner>}
         <TextField
           label="Mobile number"
           type="tel"
