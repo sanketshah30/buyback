@@ -1,0 +1,46 @@
+.document-proof-page {
+  gap: 10px;
+}
+
+.document-proof-page .section-label {
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+}
+
+.document-proof-page__doc {
+  aspect-ratio: auto;
+  height: 96px;
+  gap: 4px;
+}
+
+.document-proof-page__doc .upload-slot__label {
+  font-size: 0.7rem;
+  padding: 0 10px;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.document-proof-page__icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.document-proof-page .upload-grid {
+  gap: 6px;
+}
+
+.document-proof-page .upload-slot {
+  gap: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.document-proof-page .upload-slot__label {
+  font-size: 0.68rem;
+}
+
+.document-proof-page .upload-slot--filled .upload-slot__label {
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 12px;
+  font-size: 0.65rem;
+}

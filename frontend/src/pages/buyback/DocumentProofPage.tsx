@@ -8,6 +8,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { useBuyback } from '../../hooks/useBuyback';
 import { ApiError } from '../../lib/api';
 import { buybackApi } from '../../lib/buybackApi';
+import './DocumentProofPage.css';
 
 const SIDES = [
   { id: 'front', label: 'Front' },
@@ -29,8 +30,8 @@ export function DocumentProofPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (loading) return <PageShell title="Document &amp; device proof"><Spinner /></PageShell>;
-  if (!data) return <PageShell title="Document &amp; device proof"><Banner tone="error">Buyback request not found.</Banner></PageShell>;
+  if (loading) return <PageShell title="Document & device proof"><Spinner /></PageShell>;
+  if (!data) return <PageShell title="Document & device proof"><Banner tone="error">Buyback request not found.</Banner></PageShell>;
 
   const needsProductImages = data.assessmentMethod === 'questionnaire';
   const allProductImagesFilled = SIDES.every((side) => Boolean(productImages[side.id]));
@@ -69,12 +70,7 @@ export function DocumentProofPage() {
 
   return (
     <PageShell
-      title="Document &amp; device proof"
-      subtitle={
-        needsProductImages
-          ? 'Upload a document proof and 6-side device images'
-          : 'Upload a document proof for verification'
-      }
+      title="Document & device proof"
       footer={
         <>
           {status && <Banner tone="info">{status}</Banner>}
@@ -85,47 +81,58 @@ export function DocumentProofPage() {
         </>
       }
     >
-      <ProgressSteps current={6} total={7} />
+      <div className="document-proof-page">
+        <ProgressSteps current={6} total={7} />
 
-      <section>
-        <h3 className="section-label">Document proof</h3>
-        <label className="upload-slot" style={{ aspectRatio: 'auto', height: 180 }}>
-          {document ? (
-            <img src={URL.createObjectURL(document)} alt="Document proof" />
-          ) : (
-            <span style={{ fontSize: '2rem' }}>🪪</span>
-          )}
-          <span className="upload-slot__label">{document ? document.name : 'Tap to capture/upload a government ID or invoice'}</span>
-          <input type="file" accept="image/*" capture="environment" onChange={(e) => setDocument(e.target.files?.[0] ?? null)} />
-        </label>
-      </section>
-
-      {needsProductImages && (
         <section>
-          <h3 className="section-label">6-side device images</h3>
-          <div className="upload-grid">
-            {SIDES.map((side) => {
-              const file = productImages[side.id];
-              return (
-                <label key={side.id} className={`upload-slot ${file ? 'upload-slot--filled' : ''}`}>
-                  {file ? (
-                    <img src={URL.createObjectURL(file)} alt={side.label} />
-                  ) : (
-                    <span style={{ fontSize: '1.6rem' }}>📷</span>
-                  )}
-                  <span className="upload-slot__label">{side.label}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => setProductImages((prev) => ({ ...prev, [side.id]: e.target.files?.[0] ?? null }))}
-                  />
-                </label>
-              );
-            })}
-          </div>
+          <h3 className="section-label">Document proof</h3>
+          <label className="upload-slot document-proof-page__doc">
+            {document ? (
+              <img src={URL.createObjectURL(document)} alt="Document proof" />
+            ) : (
+              <span className="document-proof-page__icon">🪪</span>
+            )}
+            <span className="upload-slot__label">
+              {document ? document.name : 'Tap to upload ID or invoice'}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setDocument(e.target.files?.[0] ?? null)}
+            />
+          </label>
         </section>
-      )}
+
+        {needsProductImages && (
+          <section>
+            <h3 className="section-label">6-side device images</h3>
+            <div className="upload-grid">
+              {SIDES.map((side) => {
+                const file = productImages[side.id];
+                return (
+                  <label key={side.id} className={`upload-slot ${file ? 'upload-slot--filled' : ''}`}>
+                    {file ? (
+                      <img src={URL.createObjectURL(file)} alt={side.label} />
+                    ) : (
+                      <span className="document-proof-page__icon">📷</span>
+                    )}
+                    <span className="upload-slot__label">{side.label}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) =>
+                        setProductImages((prev) => ({ ...prev, [side.id]: e.target.files?.[0] ?? null }))
+                      }
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
     </PageShell>
   );
 }
