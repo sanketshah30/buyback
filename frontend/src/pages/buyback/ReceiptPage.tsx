@@ -10,10 +10,10 @@ import { api, ApiError } from '../../lib/api';
 /**
  * Lets the partner preview the legal purchase-receipt PDF in-app (see
  * server/src/services/receipt.service.ts) for a completed buyback. The PDF
- * is served by the same auth-gated `GET /api/uploads/:buybackId/:filename`
- * route as every other upload, so a plain `<iframe src="...">` won't work
- * (it can't carry the Authorization header) - instead we fetch it as a
- * blob via `api.getBlob()` and render that as an object URL.
+ * is served by the same auth-gated uploads route as every other file, so a
+ * plain `<iframe src>` can't carry Authorization - we fetch a blob URL and
+ * render pages with PDF.js scaled to the container width (mobile browsers
+ * ignore `#view=FitH` on blob iframes).
  */
 export function ReceiptPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +21,17 @@ export function ReceiptPage() {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(true);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [Viewer, setViewer] = useState<null | typeof import('../../components/ReceiptPdfViewer').ReceiptPdfViewer>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void import('../../components/ReceiptPdfViewer').then((mod) => {
+      if (!cancelled) setViewer(() => mod.ReceiptPdfViewer);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!data?.receiptUrl) {
@@ -65,16 +76,8 @@ export function ReceiptPage() {
         </Banner>
       )}
       {pdfError && <Banner tone="error">{pdfError}</Banner>}
-      {loadingPdf && <Spinner label="Loading receipt…" />}
-      {blobUrl && (
-        <div className="receipt-viewer">
-          <iframe
-            src={`${blobUrl}#view=FitH`}
-            title="Purchase receipt PDF"
-            className="receipt-viewer__frame"
-          />
-        </div>
-      )}
+      {(loadingPdf || (blobUrl && !Viewer)) && <Spinner label="Loading receipt…" />}
+      {blobUrl && Viewer && <Viewer url={blobUrl} />}
     </PageShell>
   );
 }
