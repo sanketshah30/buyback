@@ -4,8 +4,9 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './lib/auth';
 import { BuybackDraftProvider } from './lib/buybackDraft';
 import { LoginPage } from './pages/LoginPage';
-import { OtpVerifyPage } from './pages/OtpVerifyPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { HistoryDetailPage } from './pages/HistoryDetailPage';
 import { NewBuybackPage } from './pages/buyback/NewBuybackPage';
 import { AssessmentMethodPage } from './pages/buyback/AssessmentMethodPage';
 import { QuestionnairePage } from './pages/buyback/QuestionnairePage';
@@ -26,13 +27,29 @@ function App() {
         <OfflineGate>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/otp" element={<OtpVerifyPage />} />
+            <Route path="/otp" element={<Navigate to="/login" replace />} />
 
             <Route
               path="/"
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute>
+                  <HistoryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/history/:id"
+              element={
+                <ProtectedRoute>
+                  <HistoryDetailPage />
                 </ProtectedRoute>
               }
             />

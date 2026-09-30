@@ -73,3 +73,19 @@
   color: var(--color-gold);
   white-space: nowrap;
 }
+
+.dashboard-history-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-history-link h2 {
+  font-size: 1.05rem;
+  color: var(--color-text);
+}
+
+.dashboard-history-link p {
+  margin-top: 6px;
+}

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BarcodeScanner } from '../../components/BarcodeScanner';
 import { AccordionSection } from '../../components/ui/AccordionSection';
 import { Banner } from '../../components/ui/Banner';
 import { Button } from '../../components/ui/Button';
@@ -14,17 +15,9 @@ import type { Brand, Category, Product, Sku } from '../../types/api';
 
 type SectionKey = 'category' | 'device' | 'product';
 
-function randomDigits(length: number) {
-  let result = '';
-  for (let i = 0; i < length; i += 1) result += Math.floor(Math.random() * 10);
-  return result;
-}
-
-function randomSerial(length: number) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i += 1) result += chars[Math.floor(Math.random() * chars.length)];
-  return result;
+function normalizeScannedValue(raw: string, smartphone: boolean) {
+  if (smartphone) return raw.replace(/\D/g, '').slice(0, 16);
+  return raw.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16).toUpperCase();
 }
 
 export function NewBuybackPage() {
@@ -32,6 +25,7 @@ export function NewBuybackPage() {
   const { draft, setCategoryBrand, setIdentifier, setProduct } = useBuybackDraft();
 
   const [activeSection, setActiveSection] = useState<SectionKey>(draft.category && draft.brand ? (draft.identifier ? 'product' : 'device') : 'category');
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // Section 1: category + brand. IDs are numeric in the domain model, but this
   // custom Select component's dropdown value is always a string - converted
@@ -107,9 +101,13 @@ export function NewBuybackPage() {
   const deviceStatus = activeSection === 'device' ? 'active' : draft.identifier ? 'done' : 'pending';
   const productStatus = activeSection === 'product' ? 'active' : 'pending';
 
-  const handleScanSimulate = () => {
-    setDeviceValue(isSmartphone ? randomDigits(16) : randomSerial(14));
-  };
+  const handleBarcodeScan = useCallback(
+    (raw: string) => {
+      setDeviceValue(normalizeScannedValue(raw, isSmartphone));
+      setScannerOpen(false);
+    },
+    [isSmartphone],
+  );
 
   // Reopening an earlier section clears its input (and whatever came after it) so the
   // user starts that step fresh rather than silently auto-advancing again with stale
@@ -201,7 +199,7 @@ export function NewBuybackPage() {
               <button
                 type="button"
                 className="text-field__icon-btn"
-                onClick={handleScanSimulate}
+                onClick={() => setScannerOpen(true)}
                 aria-label={isSmartphone ? 'Scan IMEI barcode' : 'Scan serial barcode'}
                 title={isSmartphone ? 'Scan IMEI barcode' : 'Scan serial barcode'}
               >
@@ -250,6 +248,13 @@ export function NewBuybackPage() {
           />
         </AccordionSection>
       </div>
+
+      <BarcodeScanner
+        open={scannerOpen}
+        title={isSmartphone ? 'Scan IMEI barcode' : 'Scan serial barcode'}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleBarcodeScan}
+      />
     </PageShell>
   );
 }

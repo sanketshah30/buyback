@@ -30,3 +30,14 @@
   gap: 18px;
   margin-top: 24px;
 }
+
+.login-form__link {
+  background: none;
+  border: none;
+  color: var(--color-gold);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px;
+  align-self: center;
+}

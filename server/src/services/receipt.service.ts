@@ -20,11 +20,17 @@ function formatDate(iso: string): string {
   });
 }
 
+const PAGE_WIDTH = 420;
+const PAGE_MARGIN = 28;
+const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
+
 function row(doc: PDFKit.PDFDocument, label: string, value: string) {
-  const labelWidth = 170;
+  const labelWidth = 140;
   const y = doc.y;
-  doc.font('Bold').fontSize(10).text(label, 50, y, { width: labelWidth });
-  doc.font('Regular').fontSize(10).text(value || '-', 50 + labelWidth, y, { width: 340 });
+  doc.font('Bold').fontSize(10).text(label, PAGE_MARGIN, y, { width: labelWidth });
+  doc.font('Regular').fontSize(10).text(value || '-', PAGE_MARGIN + labelWidth, y, {
+    width: CONTENT_WIDTH - labelWidth,
+  });
   doc.moveDown(0.6);
 }
 
@@ -46,7 +52,9 @@ export async function generatePurchaseReceipt(request: BuybackRequest, partnerLo
   fs.mkdirSync(dir, { recursive: true });
   const filePath = path.join(dir, RECEIPT_FILENAME);
 
-  const doc = new PDFDocument({ size: 'A4', margin: 50, font: FONT_REGULAR });
+  // Narrow receipt-style page so the PDF fits the mobile viewer width without
+  // horizontal scrolling (A4 is much wider than a phone content column).
+  const doc = new PDFDocument({ size: [PAGE_WIDTH, 700], margin: PAGE_MARGIN, font: FONT_REGULAR });
   doc.registerFont('Regular', FONT_REGULAR);
   doc.registerFont('Bold', FONT_BOLD);
 

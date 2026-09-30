@@ -32,11 +32,12 @@ export function DocumentProofPage() {
   if (!data) return <PageShell title="Document &amp; device proof"><Banner tone="error">Buyback request not found.</Banner></PageShell>;
 
   const needsProductImages = data.assessmentMethod === 'questionnaire';
-  const filledImageCount = Object.values(productImages).filter(Boolean).length;
-  const canSubmit = Boolean(document) && (!needsProductImages || filledImageCount > 0);
+  const allProductImagesFilled = SIDES.every((side) => Boolean(productImages[side.id]));
+  const canSubmit = Boolean(document) && (!needsProductImages || allProductImagesFilled);
 
   const handleSubmit = async () => {
     if (!id || !document) return;
+    if (needsProductImages && !allProductImagesFilled) return;
     setSubmitting(true);
     setError(null);
     try {

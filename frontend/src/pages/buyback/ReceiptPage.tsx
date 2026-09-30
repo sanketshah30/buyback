@@ -67,11 +67,13 @@ export function ReceiptPage() {
       {pdfError && <Banner tone="error">{pdfError}</Banner>}
       {loadingPdf && <Spinner label="Loading receipt…" />}
       {blobUrl && (
-        <iframe
-          src={blobUrl}
-          title="Purchase receipt PDF"
-          style={{ width: '100%', height: '70vh', border: '1px solid var(--color-border, #e0e0e0)', borderRadius: 8 }}
-        />
+        <div className="receipt-viewer">
+          <iframe
+            src={`${blobUrl}#view=FitH`}
+            title="Purchase receipt PDF"
+            className="receipt-viewer__frame"
+          />
+        </div>
       )}
     </PageShell>
   );
