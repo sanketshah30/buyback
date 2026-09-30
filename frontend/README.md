@@ -36,11 +36,19 @@ which has no backend behind it) and/or direct links to any non-root route (e.g. 
 404 as well:
 
 1. **Set `VITE_API_BASE_URL`** in this project's Vercel environment variables to your
-   backend's exact deployed URL (e.g. `https://your-backend.vercel.app`, no trailing
-   slash), then **redeploy** (env var changes don't apply until a new build runs - see
-   above). Also make sure the backend's `CLIENT_ORIGIN` env var is set to this frontend's
-   exact URL, or its CORS check will reject every request - see `server/README.md`'s
-   "Deploying to Vercel" section.
+   backend's exact deployed URL (e.g. `https://your-backend.vercel.app`), then
+   **redeploy** (env var changes don't apply until a new build runs - see above). A
+   trailing slash is harmless either way - `src/lib/api.ts` strips it - but a value with
+   the wrong host/scheme, or a backend that isn't reachable at all, will surface in the
+   browser console as a generic **"CORS error"** even though the real problem has nothing
+   to do with CORS: any response that isn't a clean, successful reply from the Express app
+   itself (a platform-level 404/redirect/error page from a malformed URL or unreachable
+   host) won't carry an `Access-Control-Allow-Origin` header, and the browser reports that
+   as a CORS failure regardless of the actual underlying cause - check the request's
+   actual URL and status in the Network tab first, don't assume it's really a CORS config
+   problem. Also make sure the backend's `CLIENT_ORIGIN` env var is set to this frontend's
+   exact URL, or its CORS check will reject every request once it *does* get reached - see
+   `server/README.md`'s "Deploying to Vercel" section.
 2. **`vercel.json`** (already committed at the project root) rewrites every path to
    `/index.html`, so React Router's client-side routes (e.g. `/login`, `/buyback/3/review`)
    resolve correctly on a hard refresh or a directly-typed/shared URL - without it, Vercel's
