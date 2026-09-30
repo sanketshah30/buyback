@@ -1,4 +1,5 @@
 import { api } from './api';
+import { uploadBuybackFile, uploadBuybackFiles, type UploadProgress } from './blobUpload';
 import type { BuybackRequest, QuestionnaireAnswer } from '../types/api';
 
 export interface CustomerOtpResponse {
@@ -18,15 +19,17 @@ export const buybackApi = {
     api.patch<BuybackRequest>(`/api/buyback/${id}/product`, { productId, skuId }),
   submitQuestionnaire: (id: string, answers: QuestionnaireAnswer[]) =>
     api.post<BuybackRequest>(`/api/buyback/${id}/assessment/questionnaire`, { answers }),
-  submitImages: (id: string, files: File[]) => {
-    const form = new FormData();
-    files.forEach((file) => form.append('images', file));
-    return api.upload<BuybackRequest>(`/api/buyback/${id}/assessment/images`, form);
+  submitImages: async (
+    id: string,
+    files: File[],
+    onFileProgress?: (index: number, label: string, progress: UploadProgress | { error: string }) => void,
+  ) => {
+    const pathnames = await uploadBuybackFiles(id, 'assessment', files, onFileProgress);
+    return api.post<BuybackRequest>(`/api/buyback/${id}/assessment/images`, { pathnames });
   },
-  submitVideo: (id: string, file: File) => {
-    const form = new FormData();
-    form.append('video', file);
-    return api.upload<BuybackRequest>(`/api/buyback/${id}/assessment/video`, form);
+  submitVideo: async (id: string, file: File, onProgress?: (progress: UploadProgress) => void) => {
+    const pathname = await uploadBuybackFile(id, 'video', file, onProgress);
+    return api.post<BuybackRequest>(`/api/buyback/${id}/assessment/video`, { pathname });
   },
   runValuation: (id: string) => api.post<BuybackRequest>(`/api/buyback/${id}/valuation`),
   initiateDiagnosis: (id: string) => api.post<BuybackRequest>(`/api/buyback/${id}/diagnosis/initiate`),
@@ -39,15 +42,17 @@ export const buybackApi = {
     api.post<CustomerOtpResponse>(`/api/buyback/${id}/customer/resend-otp`, { channel }),
   verifyCustomerOtp: (id: string, otp: string) =>
     api.post<BuybackRequest>(`/api/buyback/${id}/customer/verify-otp`, { otp }),
-  uploadDocument: (id: string, file: File) => {
-    const form = new FormData();
-    form.append('document', file);
-    return api.upload<BuybackRequest>(`/api/buyback/${id}/documents`, form);
+  uploadDocument: async (id: string, file: File, onProgress?: (progress: UploadProgress) => void) => {
+    const pathname = await uploadBuybackFile(id, 'document', file, onProgress);
+    return api.post<BuybackRequest>(`/api/buyback/${id}/documents`, { pathname });
   },
-  uploadProductImages: (id: string, files: File[]) => {
-    const form = new FormData();
-    files.forEach((file) => form.append('images', file));
-    return api.upload<BuybackRequest>(`/api/buyback/${id}/product-images`, form);
+  uploadProductImages: async (
+    id: string,
+    files: File[],
+    onFileProgress?: (index: number, label: string, progress: UploadProgress | { error: string }) => void,
+  ) => {
+    const pathnames = await uploadBuybackFiles(id, 'product', files, onFileProgress);
+    return api.post<BuybackRequest>(`/api/buyback/${id}/product-images`, { pathnames });
   },
   confirm: (id: string) => api.post<BuybackRequest>(`/api/buyback/${id}/confirm`),
   cancel: (id: string) => api.post<BuybackRequest>(`/api/buyback/${id}/cancel`),

@@ -204,7 +204,7 @@ export interface BuybackRequest {
   };
   documentProofUrl?: string;
   productImageUrls?: string[];
-  /** The purchase-receipt PDF generated once /confirm completes the buyback - see services/receipt.service.ts. Served the same way as other uploads, via GET /api/uploads/:buybackId/:filename. */
+  /** Object pathname (e.g. buybacks/<id>/receipt/receipt.pdf) served via GET /api/uploads/... */
   receiptUrl?: string;
   createdAt: string;
   updatedAt: string;

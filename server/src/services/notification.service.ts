@@ -1,7 +1,8 @@
 export interface EmailAttachment {
   filename: string;
-  /** Absolute path on local disk to the file to attach - e.g. the generated purchase-receipt PDF (see services/receipt.service.ts). */
-  path: string;
+  /** Absolute path on local disk (legacy) or in-memory PDF bytes from Blob. */
+  path?: string;
+  content?: Buffer;
 }
 
 export interface SendEmailOptions {

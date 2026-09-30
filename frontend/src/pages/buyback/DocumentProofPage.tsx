@@ -26,6 +26,7 @@ export function DocumentProofPage() {
   const [document, setDocument] = useState<File | null>(null);
   const [productImages, setProductImages] = useState<Record<string, File | null>>({});
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (loading) return <PageShell title="Document &amp; device proof"><Spinner /></PageShell>;
@@ -40,17 +41,29 @@ export function DocumentProofPage() {
     if (needsProductImages && !allProductImagesFilled) return;
     setSubmitting(true);
     setError(null);
+    setStatus(null);
     try {
-      await buybackApi.uploadDocument(id, document);
+      setStatus('Uploading document…');
+      await buybackApi.uploadDocument(id, document, (progress) => {
+        setStatus(`Uploading document… ${Math.round(progress.percentage)}%`);
+      });
+
       if (needsProductImages) {
         const selected = SIDES.map((side) => productImages[side.id]).filter((f): f is File => Boolean(f));
-        await buybackApi.uploadProductImages(id, selected);
+        await buybackApi.uploadProductImages(id, selected, (index, label, progress) => {
+          if ('error' in progress) {
+            setError(`${SIDES[index]?.label ?? label}: ${progress.error}`);
+            return;
+          }
+          setStatus(`Uploading ${SIDES[index]?.label ?? label} (${index + 1}/${selected.length})… ${Math.round(progress.percentage)}%`);
+        });
       }
       navigate(`/buyback/${id}/review`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to upload documents/images');
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Failed to upload documents/images');
     } finally {
       setSubmitting(false);
+      setStatus(null);
     }
   };
 
@@ -64,6 +77,7 @@ export function DocumentProofPage() {
       }
       footer={
         <>
+          {status && <Banner tone="info">{status}</Banner>}
           {error && <Banner tone="error">{error}</Banner>}
           <Button onClick={handleSubmit} loading={submitting} disabled={!canSubmit}>
             Continue to review

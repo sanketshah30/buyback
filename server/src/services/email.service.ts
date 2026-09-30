@@ -1,4 +1,5 @@
 import { BuybackRequest, Partner, PartnerLocation } from '../types/domain';
+import { readObjectBuffer } from './blobStorage.service';
 import { notificationService } from './notification.service';
 
 /**
@@ -11,24 +12,8 @@ import { notificationService } from './notification.service';
  * templates). Each function is a no-op if the required recipient email
  * isn't on file, rather than throwing - a missing email should never block
  * the underlying buyback action.
- *
- * The four communications this module covers (see server/README.md "Email
- * communication module"):
- *   1. sendOtpEmail            - customer buyback-confirmation OTP
- *   2. sendBuybackCompletedEmail - customer, once /confirm completes the buyback
- *   3. sendVendorAllocationEmail  - allocated vendor, once /confirm completes the buyback
- *   4. sendBuybackCancelledEmail  - customer, once /cancel cancels the buyback
  */
 export const emailService = {
-  /**
-   * Always carries the *real* OTP code, independent of
-   * `MOCK_OTP_EXPOSE_IN_RESPONSE` - that env flag only controls whether the
-   * HTTP response body echoes the code back (a dev/testing convenience);
-   * it must never affect what's actually delivered to the customer. Called
-   * from auth.service.ts's requestOtp() for every buyback-confirmation OTP
-   * request/resend, so the customer always gets it by email in addition to
-   * SMS, regardless of resend channel.
-   */
   async sendOtpEmail(email: string, otp: string, ttlMinutes: number): Promise<void> {
     await notificationService.sendEmail(
       email,
@@ -37,37 +22,41 @@ export const emailService = {
     );
   },
 
-  /**
-   * Sent to the customer once POST /api/buyback/:id/confirm advances
-   * requestStatusId to "Completed" - carries the generated purchase-receipt
-   * PDF (see services/receipt.service.ts) as an attachment, and cc's the
-   * purchasing partner location's own email (if one is on file) so they
-   * have a copy of the same legal proof-of-purchase too.
-   */
-  async sendBuybackCompletedEmail(request: BuybackRequest, receiptFilePath?: string, partnerLocation?: PartnerLocation): Promise<void> {
+  async sendBuybackCompletedEmail(
+    request: BuybackRequest,
+    receiptPathname?: string,
+    partnerLocation?: PartnerLocation,
+  ): Promise<void> {
     const email = request.customer?.email;
     if (!email) return;
     const value = request.finalValue ?? request.maxValue;
     const reference = request.referenceId ?? `#${request.id}`;
+
+    let attachments: { filename: string; content: Buffer }[] | undefined;
+    if (receiptPathname) {
+      try {
+        const { buffer } = await readObjectBuffer(receiptPathname);
+        attachments = [{ filename: `buyback-receipt-${reference}.pdf`, content: buffer }];
+      } catch {
+        attachments = undefined;
+      }
+    }
+
     await notificationService.sendEmail(
       email,
       `Your buyback ${reference} is complete`,
       `Good news - your buyback request ${reference} has been completed` +
         (value !== undefined ? ` for a final value of \u20b9${value}.` : '.') +
-        (receiptFilePath ? ' Thank you for trading in with us! Your purchase receipt is attached for your records.' : ' Thank you for trading in with us!'),
+        (attachments
+          ? ' Thank you for trading in with us! Your purchase receipt is attached for your records.'
+          : ' Thank you for trading in with us!'),
       {
         cc: partnerLocation?.email,
-        attachments: receiptFilePath ? [{ filename: `buyback-receipt-${reference}.pdf`, path: receiptFilePath }] : undefined,
+        attachments,
       },
     );
   },
 
-  /**
-   * Sent to the allocated vendor once the buyback completes - not at
-   * allocation time - since that's when the vendor actually owes payment
-   * before the device is delivered to them (see buybackEngine.service.ts's
-   * allocate phase for how `vendor`/`vendorPayable` were determined).
-   */
   async sendVendorAllocationEmail(vendor: Partner, request: BuybackRequest): Promise<void> {
     if (!vendor.email) return;
     const reference = request.referenceId ?? `#${request.id}`;
@@ -80,7 +69,6 @@ export const emailService = {
     );
   },
 
-  /** Sent to the customer once POST /api/buyback/:id/cancel advances requestStatusId to "Cancelled". */
   async sendBuybackCancelledEmail(request: BuybackRequest): Promise<void> {
     const email = request.customer?.email;
     if (!email) return;

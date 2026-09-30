@@ -3,7 +3,6 @@ import { REQUEST_STATUS_AMOUNT_CALCULATED_ID, REQUEST_STATUS_BUYBACK_ACCEPTED_ID
 import { catalogRepository, buybackRepository, buybackStatusHistoryRepository, buybackVendorCalculationLogRepository, partnerLocationRepository, partnerRepository, questionnaireConfigRepository, userRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { requireRight } from '../middleware/rights.middleware';
-import { toPublicUrl, upload } from '../middleware/upload.middleware';
 import { ResolvedQuestionnaireQuestion } from '../repositories/interfaces';
 import { assessmentService } from '../services/assessment.service';
 import { authService } from '../services/auth.service';
@@ -16,6 +15,7 @@ import { applyDiagnosisAdjustment, applyNoDiagnosisDrop } from '../services/valu
 import { BuybackRequest, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
 import { nextId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
+import { verifyBuybackPathnames } from './uploads.routes';
 
 export const buybackRouter = Router();
 buybackRouter.use(requireAuth);
@@ -41,9 +41,7 @@ async function loadOwnedBuyback(rawId: string, userId: number): Promise<BuybackR
 }
 
 /**
- * Verifies buyback ownership *before* the multer upload middleware runs, so a
- * request for a buyback ID the caller doesn't own is rejected before any file
- * is ever written to disk under that ID's upload folder.
+ * Verifies buyback ownership for upload-related mutations.
  */
 async function requireOwnedBuybackForUpload(req: AuthedRequest, _res: Response, next: NextFunction) {
   try {
@@ -52,6 +50,12 @@ async function requireOwnedBuybackForUpload(req: AuthedRequest, _res: Response, 
   } catch (err) {
     next(err);
   }
+}
+
+function asPathnameList(body: { pathname?: string; pathnames?: string[] }): string[] {
+  if (Array.isArray(body.pathnames) && body.pathnames.length > 0) return body.pathnames.map(String);
+  if (body.pathname) return [String(body.pathname)];
+  return [];
 }
 
 /** Every promoter/staff user acts on behalf of their own current partner location - see "Authentication, sessions & role-based access" in server/README.md. */
@@ -218,63 +222,61 @@ buybackRouter.post('/:id/assessment/questionnaire', async (req: AuthedRequest, r
   }
 });
 
-buybackRouter.post(
-  '/:id/assessment/images',
-  requireOwnedBuybackForUpload,
-  upload.array('images', 6),
-  async (req: AuthedRequest, res, next) => {
-    try {
-      const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-      const location = await resolvePromoterLocation(req.auth!.userId);
-
-      const files = (req.files as Express.Multer.File[]) ?? [];
-      if (files.length < 1) {
-        return res.status(400).json({ error: 'At least one image is required (6 recommended: front, back, top, bottom, left, right)' });
-      }
-
-      const questions = await resolveQuestionnaireFor(request, location);
-      const aiAssessment = assessmentService.runImageAssessment(questions, files.length);
-
-      const updated = await buybackRepository.update(request.id, {
-        assessmentMethod: 'image',
-        assessmentImageUrls: files.map((f) => toPublicUrl(request.id, f.filename)),
-        aiAssessment,
-        questionnaireAnswers: aiAssessment.generatedAnswers,
-        status: 'assessment_completed',
+buybackRouter.post('/:id/assessment/images', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    const location = await resolvePromoterLocation(req.auth!.userId);
+    const incoming = asPathnameList(req.body ?? {});
+    if (incoming.length < 1) {
+      return res.status(400).json({
+        error: 'At least one image pathname is required (6 recommended: front, back, top, bottom, left, right)',
       });
-      return res.json(updated);
-    } catch (err) {
-      return next(err);
     }
-  },
-);
 
-buybackRouter.post(
-  '/:id/assessment/video',
-  requireOwnedBuybackForUpload,
-  upload.single('video'),
-  async (req: AuthedRequest, res, next) => {
-    try {
-      const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-      const location = await resolvePromoterLocation(req.auth!.userId);
-      if (!req.file) return res.status(400).json({ error: 'A video file is required' });
+    const pathnames = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    const replace = String(req.query.replace ?? '1') !== '0';
+    const assessmentImageUrls = replace
+      ? pathnames
+      : [...(request.assessmentImageUrls ?? []), ...pathnames];
+    const questions = await resolveQuestionnaireFor(request, location);
+    const aiAssessment = assessmentService.runImageAssessment(questions, assessmentImageUrls.length);
 
-      const questions = await resolveQuestionnaireFor(request, location);
-      const aiAssessment = assessmentService.runVideoAssessment(questions);
+    const updated = await buybackRepository.update(request.id, {
+      assessmentMethod: 'image',
+      assessmentImageUrls,
+      aiAssessment,
+      questionnaireAnswers: aiAssessment.generatedAnswers,
+      status: 'assessment_completed',
+    });
+    return res.json(updated);
+  } catch (err) {
+    return next(err);
+  }
+});
 
-      const updated = await buybackRepository.update(request.id, {
-        assessmentMethod: 'video',
-        assessmentVideoUrl: toPublicUrl(request.id, req.file.filename),
-        aiAssessment,
-        questionnaireAnswers: aiAssessment.generatedAnswers,
-        status: 'assessment_completed',
-      });
-      return res.json(updated);
-    } catch (err) {
-      return next(err);
-    }
-  },
-);
+buybackRouter.post('/:id/assessment/video', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    const location = await resolvePromoterLocation(req.auth!.userId);
+    const incoming = asPathnameList(req.body ?? {});
+    if (incoming.length !== 1) return res.status(400).json({ error: 'A video pathname is required' });
+
+    const [pathname] = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    const questions = await resolveQuestionnaireFor(request, location);
+    const aiAssessment = assessmentService.runVideoAssessment(questions);
+
+    const updated = await buybackRepository.update(request.id, {
+      assessmentMethod: 'video',
+      assessmentVideoUrl: pathname,
+      aiAssessment,
+      questionnaireAnswers: aiAssessment.generatedAnswers,
+      status: 'assessment_completed',
+    });
+    return res.json(updated);
+  } catch (err) {
+    return next(err);
+  }
+});
 
 /**
  * Runs the full buyback request creation engine in sequence - see
@@ -480,47 +482,43 @@ buybackRouter.post('/:id/customer/verify-otp', async (req: AuthedRequest, res, n
   }
 });
 
-buybackRouter.post(
-  '/:id/documents',
-  requireOwnedBuybackForUpload,
-  upload.single('document'),
-  async (req: AuthedRequest, res, next) => {
-    try {
-      const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-      if (!req.file) return res.status(400).json({ error: 'A document image is required' });
+buybackRouter.post('/:id/documents', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    const incoming = asPathnameList(req.body ?? {});
+    if (incoming.length !== 1) return res.status(400).json({ error: 'A document pathname is required' });
 
-      const requiresProductImages = request.assessmentMethod === 'questionnaire';
-      const updated = await buybackRepository.update(request.id, {
-        documentProofUrl: toPublicUrl(request.id, req.file.filename),
-        status: requiresProductImages ? 'document_uploaded' : 'product_images_uploaded',
-      });
-      return res.json(updated);
-    } catch (err) {
-      return next(err);
-    }
-  },
-);
+    const [pathname] = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    const requiresProductImages = request.assessmentMethod === 'questionnaire';
+    const updated = await buybackRepository.update(request.id, {
+      documentProofUrl: pathname,
+      status: requiresProductImages ? 'document_uploaded' : 'product_images_uploaded',
+    });
+    return res.json(updated);
+  } catch (err) {
+    return next(err);
+  }
+});
 
-buybackRouter.post(
-  '/:id/product-images',
-  requireOwnedBuybackForUpload,
-  upload.array('images', 6),
-  async (req: AuthedRequest, res, next) => {
-    try {
-      const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-      const files = (req.files as Express.Multer.File[]) ?? [];
-      if (files.length < 1) return res.status(400).json({ error: 'At least one product image is required' });
+buybackRouter.post('/:id/product-images', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+  try {
+    const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
+    const incoming = asPathnameList(req.body ?? {});
+    if (incoming.length < 1) return res.status(400).json({ error: 'At least one product image pathname is required' });
 
-      const updated = await buybackRepository.update(request.id, {
-        productImageUrls: files.map((f) => toPublicUrl(request.id, f.filename)),
-        status: 'product_images_uploaded',
-      });
-      return res.json(updated);
-    } catch (err) {
-      return next(err);
-    }
-  },
-);
+    const pathnames = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    const replace = String(req.query.replace ?? '1') !== '0';
+    const productImageUrls = replace ? pathnames : [...(request.productImageUrls ?? []), ...pathnames];
+
+    const updated = await buybackRepository.update(request.id, {
+      productImageUrls,
+      status: 'product_images_uploaded',
+    });
+    return res.json(updated);
+  } catch (err) {
+    return next(err);
+  }
+});
 
 buybackRouter.post('/:id/confirm', async (req: AuthedRequest, res, next) => {
   try {
@@ -554,18 +552,19 @@ buybackRouter.post('/:id/confirm', async (req: AuthedRequest, res, next) => {
     const partnerLocation = updated.partnerLocationId !== undefined
       ? await partnerLocationRepository.findById(updated.partnerLocationId)
       : undefined;
-    let receiptFilePath: string | undefined;
+    let receiptPathname: string | undefined;
     if (partnerLocation) {
       const receipt = await generatePurchaseReceipt(updated, partnerLocation);
-      updated = await buybackRepository.update(request.id, { receiptUrl: receipt.publicUrl });
-      receiptFilePath = receipt.filePath;
+      // Store pathname; clients download via /api/uploads/<pathname>
+      updated = await buybackRepository.update(request.id, { receiptUrl: receipt.pathname });
+      receiptPathname = receipt.pathname;
     }
 
     // Email communication module (see services/email.service.ts): the
     // customer gets the receipt attached to their completion email (cc'd
     // to the partner location), and the allocated vendor is told a
     // payment is due before the device ships to them.
-    await emailService.sendBuybackCompletedEmail(updated, receiptFilePath, partnerLocation);
+    await emailService.sendBuybackCompletedEmail(updated, receiptPathname, partnerLocation);
     if (updated.allocatedVendorId !== undefined) {
       const vendor = await partnerRepository.findById(updated.allocatedVendorId);
       if (vendor) await emailService.sendVendorAllocationEmail(vendor, updated);

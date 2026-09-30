@@ -15,6 +15,8 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 const TOKEN_STORAGE_KEY = 'buyback.token';
 
+export { API_BASE_URL };
+
 /**
  * Dispatched whenever an authenticated request comes back 401 - i.e. the
  * server has decided our session is no longer valid (logged out elsewhere,
@@ -65,19 +67,23 @@ async function authedFetch(path: string, options: RequestInit = {}): Promise<Res
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await authedFetch(path, options);
+  const res = await authedFetch(toRequestPath(path), options);
   const isJson = res.headers.get('content-type')?.includes('application/json');
   const data = isJson ? await res.json().catch(() => undefined) : undefined;
 
   if (!res.ok) {
-    throw new ApiError(data?.error ?? res.statusText ?? 'Request failed', res.status);
+    const fallback =
+      res.status === 413
+        ? 'Photo is too large to upload. Please try again with a smaller image.'
+        : res.statusText || 'Request failed';
+    throw new ApiError(data?.error ?? fallback, res.status);
   }
   return data as T;
 }
 
 /** For binary responses (e.g. the purchase-receipt PDF) that can't be rendered via a plain `<iframe src>` since that wouldn't carry the Authorization header - see pages/buyback/ReceiptPage.tsx. */
 async function getBlob(path: string): Promise<Blob> {
-  const res = await authedFetch(path, { method: 'GET' });
+  const res = await authedFetch(toRequestPath(path), { method: 'GET' });
   if (!res.ok) {
     let message = res.statusText || 'Request failed';
     try {
@@ -105,5 +111,12 @@ export const api = {
 export function resolveMediaUrl(url?: string): string | undefined {
   if (!url) return undefined;
   if (url.startsWith('http')) return url;
-  return `${API_BASE_URL}${url}`;
+  // Blob/local object pathnames are downloaded through the authenticated uploads API.
+  if (url.startsWith('buybacks/')) return `${API_BASE_URL}/api/uploads/${url}`;
+  return `${API_BASE_URL}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
+function toRequestPath(path: string): string {
+  if (path.startsWith('buybacks/')) return `/api/uploads/${path}`;
+  return path;
 }

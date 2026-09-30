@@ -1,8 +1,7 @@
-import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
-import { toPublicUrl, uploadsRootDir } from '../middleware/upload.middleware';
 import { BuybackRequest, PartnerLocation } from '../types/domain';
+import { buildObjectPathname, putObject } from './blobStorage.service';
 
 const RECEIPT_FILENAME = 'receipt.pdf';
 
@@ -35,36 +34,31 @@ function row(doc: PDFKit.PDFDocument, label: string, value: string) {
 }
 
 /**
- * Generates the legal purchase-receipt PDF for a completed buyback - proof
- * that `partnerLocation` bought the device from the customer - and writes
- * it to the same per-buyback uploads folder as document/product images
- * (`uploads/<buybackId>/receipt.pdf`), so it's served by the existing
- * `GET /api/uploads/:buybackId/:filename` route with no changes there
- * beyond the `.pdf` content-type mapping.
- *
- * Requires `request.customer`, `request.product`/`sku`/`identifier`, and
- * `request.finalValue` to already be set - i.e. it must be called only
- * once the buyback has actually reached "Completed" (see
- * routes/buyback.routes.ts's `/:id/confirm`).
+ * Generates the legal purchase-receipt PDF for a completed buyback in memory,
+ * then stores it via private Vercel Blob (or local disk fallback) at
+ * `buybacks/<id>/receipt/receipt.pdf`.
  */
-export async function generatePurchaseReceipt(request: BuybackRequest, partnerLocation: PartnerLocation): Promise<{ filePath: string; publicUrl: string }> {
-  const dir = path.join(uploadsRootDir, String(request.id));
-  fs.mkdirSync(dir, { recursive: true });
-  const filePath = path.join(dir, RECEIPT_FILENAME);
-
-  // Narrow receipt-style page so the PDF fits the mobile viewer width without
-  // horizontal scrolling (A4 is much wider than a phone content column).
+export async function generatePurchaseReceipt(
+  request: BuybackRequest,
+  partnerLocation: PartnerLocation,
+): Promise<{ pathname: string }> {
+  const chunks: Buffer[] = [];
   const doc = new PDFDocument({ size: [PAGE_WIDTH, 700], margin: PAGE_MARGIN, font: FONT_REGULAR });
   doc.registerFont('Regular', FONT_REGULAR);
   doc.registerFont('Bold', FONT_BOLD);
 
-  const stream = fs.createWriteStream(filePath);
-  doc.pipe(stream);
+  doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+  });
 
   const reference = request.referenceId ?? `#${request.id}`;
 
   doc.font('Bold').fontSize(18).text('Device Purchase Receipt', { align: 'center' });
-  doc.font('Regular').fontSize(10).fillColor('#555555').text('Legal proof of device purchase via buyback trade-in', { align: 'center' });
+  doc.font('Regular').fontSize(10).fillColor('#555555').text('Legal proof of device purchase via buyback trade-in', {
+    align: 'center',
+  });
   doc.fillColor('#000000');
   doc.moveDown(1.5);
 
@@ -73,7 +67,13 @@ export async function generatePurchaseReceipt(request: BuybackRequest, partnerLo
   row(doc, 'Receipt / Reference No.', reference);
   row(doc, 'Date', formatDate(request.completedAt ?? new Date().toISOString()));
   row(doc, 'Purchasing Location', partnerLocation.name);
-  row(doc, 'Location Address', [partnerLocation.address, partnerLocation.city, partnerLocation.state, partnerLocation.zipCode, partnerLocation.country].filter(Boolean).join(', '));
+  row(
+    doc,
+    'Location Address',
+    [partnerLocation.address, partnerLocation.city, partnerLocation.state, partnerLocation.zipCode, partnerLocation.country]
+      .filter(Boolean)
+      .join(', '),
+  );
   doc.moveDown(1);
 
   doc.font('Bold').fontSize(12).text('Customer');
@@ -104,10 +104,9 @@ export async function generatePurchaseReceipt(request: BuybackRequest, partnerLo
   );
 
   doc.end();
-  await new Promise<void>((resolve, reject) => {
-    stream.on('finish', () => resolve());
-    stream.on('error', reject);
-  });
+  const pdfBuffer = await done;
 
-  return { filePath, publicUrl: toPublicUrl(request.id, RECEIPT_FILENAME) };
+  const pathname = buildObjectPathname(request.id, 'receipt', RECEIPT_FILENAME);
+  await putObject(pathname, pdfBuffer, 'application/pdf');
+  return { pathname };
 }
