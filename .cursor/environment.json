@@ -1,0 +1,26 @@
+{
+  "name": "Buyback Assessment Platform",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "server",
+      "command": "npm run dev:server",
+      "description": "Express + TypeScript API (tsx watch) on http://localhost:4000"
+    },
+    {
+      "name": "frontend",
+      "command": "npm run dev:frontend",
+      "description": "React + Vite PWA dev server on http://localhost:5173"
+    }
+  ],
+  "ports": [
+    {
+      "name": "API server",
+      "port": 4000
+    },
+    {
+      "name": "Frontend (Vite)",
+      "port": 5173
+    }
+  ]
+}
