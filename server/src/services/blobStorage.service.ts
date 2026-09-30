@@ -157,6 +157,9 @@ export async function putObject(
       token: process.env.BLOB_READ_WRITE_TOKEN,
       contentType,
       addRandomSuffix: false,
+      // Receipts (and multipart fallbacks) use stable pathnames like
+      // buybacks/<id>/receipt/receipt.pdf — allow re-confirm / retries.
+      allowOverwrite: true,
     });
     return pathname;
   }
