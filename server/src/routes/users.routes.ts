@@ -7,7 +7,7 @@ import {
   userRepository,
   userRoleRepository,
 } from '../repositories';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const usersRouter = Router();
@@ -81,7 +81,7 @@ usersRouter.post('/', async (req, res, next) => {
 
     if (partnerLocationId !== undefined && partnerLocationId !== previousLocationId) {
       await userLocationHistoryRepository.record({
-        id: nextId('user_location_history'),
+        id: await allocateId('user_location_history'),
         userId: user.id,
         fromPartnerLocationId: previousLocationId,
         toPartnerLocationId: partnerLocationId,
@@ -100,7 +100,7 @@ usersRouter.post('/', async (req, res, next) => {
         const existingAssignment = await userRoleRepository.findActive(user.id, roleId);
         if (!existingAssignment) {
           await userRoleRepository.assign({
-            id: nextId('user_roles'),
+            id: await allocateId('user_roles'),
             userId: user.id,
             roleId,
             createdAt: new Date().toISOString(),
@@ -182,7 +182,7 @@ usersRouter.post('/:id/location', async (req, res, next) => {
 
     const updated = await userRepository.update(id, { partnerLocationId });
     await userLocationHistoryRepository.record({
-      id: nextId('user_location_history'),
+      id: await allocateId('user_location_history'),
       userId: existing.id,
       fromPartnerLocationId: previousLocationId,
       toPartnerLocationId: partnerLocationId,
@@ -238,7 +238,7 @@ usersRouter.post('/:id/roles', async (req, res, next) => {
     if (alreadyAssigned) return res.status(200).json(alreadyAssigned);
 
     const assignment = await userRoleRepository.assign({
-      id: nextId('user_roles'),
+      id: await allocateId('user_roles'),
       userId: existing.id,
       roleId,
       createdAt: new Date().toISOString(),

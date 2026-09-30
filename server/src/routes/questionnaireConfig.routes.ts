@@ -7,7 +7,7 @@ import {
   questionnaireConfigRepository,
 } from '../repositories';
 import { QuestionnaireConfig } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const questionnaireConfigRouter = Router();
@@ -89,7 +89,7 @@ questionnaireConfigRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const config: QuestionnaireConfig = {
-      id: nextId('questionnaire_config'),
+      id: await allocateId('questionnaire_config'),
       productCategoryId,
       brandId: brandId ?? null,
       partnerId: partnerId ?? null,

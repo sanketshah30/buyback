@@ -10,7 +10,7 @@ import {
 } from '../repositories';
 import { BuybackRequest, BuybackVendorCalculationLog, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
 import { dateKey, formatBuybackReferenceId } from '../utils/id';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { depreciationService } from './depreciation.service';
 
 /**
@@ -31,7 +31,7 @@ import { depreciationService } from './depreciation.service';
 export async function recordStatusTransition(buybackRequestId: number, requestStatusId: number, changedByUserId: number): Promise<void> {
   const now = new Date().toISOString();
   await buybackStatusHistoryRepository.record({
-    id: nextId('buyback_status_history'),
+    id: await allocateId('buyback_status_history'),
     buybackRequestId,
     requestStatusId,
     changedByUserId,
@@ -114,7 +114,7 @@ export async function calculate(
     const buybackValue = Math.max(0, Math.round(validPriceRow.price - totalDepreciationAmount));
 
     const log: BuybackVendorCalculationLog = {
-      id: nextId('buyback_vendor_calculation_log'),
+      id: await allocateId('buyback_vendor_calculation_log'),
       buybackRequestId: request.id,
       vendorId: mapping.vendorId,
       skuPricingId: validPriceRow.id,

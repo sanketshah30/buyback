@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { roleRepository } from '../repositories';
 import { Role } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const rolesRouter = Router();
@@ -28,7 +28,7 @@ rolesRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const role: Role = {
-      id: nextId('roles'),
+      id: await allocateId('roles'),
       name,
       rights: rights ?? [],
       createdAt: now,

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { catalogRepository, partnerCategoryVendorMappingRepository, partnerLocationRepository, partnerRepository } from '../repositories';
 import { PartnerCategoryVendorMapping } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const partnerCategoryVendorMappingRouter = Router();
@@ -69,7 +69,7 @@ partnerCategoryVendorMappingRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const mapping: PartnerCategoryVendorMapping = {
-      id: nextId('partner_category_vendor_mapping'),
+      id: await allocateId('partner_category_vendor_mapping'),
       partnerLocationId,
       productCategoryId,
       vendorId,

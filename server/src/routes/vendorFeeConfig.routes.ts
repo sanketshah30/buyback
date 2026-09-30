@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { catalogRepository, partnerRepository, vendorFeeConfigRepository } from '../repositories';
 import { VendorFeeConfig } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const vendorFeeConfigRouter = Router();
@@ -60,7 +60,7 @@ vendorFeeConfigRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const config: VendorFeeConfig = {
-      id: nextId('vendor_fee_config'),
+      id: await allocateId('vendor_fee_config'),
       vendorId,
       productCategoryId,
       feeAmount,

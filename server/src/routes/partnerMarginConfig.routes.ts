@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { catalogRepository, partnerLocationRepository, partnerMarginConfigRepository, partnerRepository } from '../repositories';
 import { PartnerMarginConfig } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const partnerMarginConfigRouter = Router();
@@ -76,7 +76,7 @@ partnerMarginConfigRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const config: PartnerMarginConfig = {
-      id: nextId('partner_margin_config'),
+      id: await allocateId('partner_margin_config'),
       partnerId,
       partnerLocationId,
       productCategoryId,

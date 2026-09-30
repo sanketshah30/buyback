@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { masterQuestionRepository, questionTranslationRepository } from '../repositories';
 import { MasterQuestion, QuestionType } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const questionsRouter = Router();
@@ -29,13 +29,13 @@ questionsRouter.post('/', async (req, res, next) => {
     }
 
     const now = new Date().toISOString();
-    const question: MasterQuestion = { id: nextId('questions'), type, createdAt: now, updatedAt: now, isActive: true };
+    const question: MasterQuestion = { id: await allocateId('questions'), type, createdAt: now, updatedAt: now, isActive: true };
     await masterQuestionRepository.create(question);
 
     for (const t of translations ?? []) {
       if (!t.language || !t.text) continue;
       await questionTranslationRepository.upsert({
-        id: nextId('question_translations'),
+        id: await allocateId('question_translations'),
         questionId: question.id,
         language: t.language,
         text: t.text,
@@ -102,7 +102,7 @@ questionsRouter.post('/:id/translations', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const translation = await questionTranslationRepository.upsert({
-      id: nextId('question_translations'),
+      id: await allocateId('question_translations'),
       questionId: id,
       language,
       text,

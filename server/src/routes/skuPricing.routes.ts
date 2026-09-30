@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { catalogRepository, skuPricingRepository, partnerRepository, userRepository } from '../repositories';
 import { SkuPricing } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const skuPricingRouter = Router();
@@ -73,7 +73,7 @@ skuPricingRouter.post('/', async (req: AuthedRequest, res, next) => {
 
     const now = new Date().toISOString();
     const pricing: SkuPricing = {
-      id: nextId('sku_pricing'),
+      id: await allocateId('sku_pricing'),
       vendorId,
       skuId,
       price,

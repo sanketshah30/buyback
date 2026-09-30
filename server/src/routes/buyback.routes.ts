@@ -15,7 +15,7 @@ import { generatePurchaseReceipt } from '../services/receipt.service';
 import { ingestMulterFile } from '../services/blobStorage.service';
 import { applyDiagnosisAdjustment, applyNoDiagnosisDrop } from '../services/valuation.service';
 import { BuybackRequest, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 import { verifyBuybackPathnames } from './uploads.routes';
 
@@ -102,7 +102,7 @@ buybackRouter.post('/', async (req: AuthedRequest, res, next) => {
 
     const now = new Date().toISOString();
     const request: BuybackRequest = {
-      id: nextId('buyback_requests'),
+      id: await allocateId('buyback_requests'),
       userId: req.auth!.userId,
       status: 'draft',
       category,

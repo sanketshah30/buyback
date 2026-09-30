@@ -9,7 +9,7 @@ import {
   userRoleRepository,
 } from '../repositories';
 import { OtpChallenge, Role } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { signToken } from '../utils/jwt';
 import { emailService } from './email.service';
 import { notificationService } from './notification.service';
@@ -115,7 +115,7 @@ export const authService = {
       const token = signToken({ userId: user.id, mobile: user.mobile });
       const now = new Date().toISOString();
       await sessionRepository.create({
-        id: nextId('sessions'),
+        id: await allocateId('sessions'),
         userId: user.id,
         token,
         createdAt: now,

@@ -31,6 +31,11 @@ export const env = {
 
   dataDriver: process.env.DATA_DRIVER ?? 'in-memory',
 
+  /** Pooled connection string (Vercel/Supabase injects POSTGRES_URL). */
+  postgresUrl: process.env.POSTGRES_URL || process.env.DATABASE_URL || '',
+  /** Direct/non-pooling URL for migrate/seed (POSTGRES_URL_NON_POOLING). */
+  postgresUrlDirect: process.env.POSTGRES_URL_NON_POOLING || '',
+
   db: {
     host: process.env.DB_HOST ?? 'localhost',
     port: Number(process.env.DB_PORT ?? 3306),

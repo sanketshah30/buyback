@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { depreciationConfigRepository, depreciationMatrixRepository, questionAnswerMappingRepository } from '../repositories';
 import { DepreciationMatrixEntry } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const depreciationMatrixRouter = Router();
@@ -60,7 +60,7 @@ depreciationMatrixRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const entry: DepreciationMatrixEntry = {
-      id: nextId('depreciation_matrix'),
+      id: await allocateId('depreciation_matrix'),
       depreciationConfigId,
       questionAnswerId,
       depreciationType: depreciationType as 'percentage' | 'absolute',

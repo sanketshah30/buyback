@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { answerTranslationRepository, masterAnswerRepository } from '../repositories';
 import { MasterAnswer } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const answersRouter = Router();
@@ -28,13 +28,13 @@ answersRouter.post('/', async (req, res, next) => {
     if (clash) return res.status(409).json({ error: `An answer with code "${code}" already exists` });
 
     const now = new Date().toISOString();
-    const answer: MasterAnswer = { id: nextId('answers'), code, createdAt: now, updatedAt: now, isActive: true };
+    const answer: MasterAnswer = { id: await allocateId('answers'), code, createdAt: now, updatedAt: now, isActive: true };
     await masterAnswerRepository.create(answer);
 
     for (const t of translations ?? []) {
       if (!t.language || !t.text) continue;
       await answerTranslationRepository.upsert({
-        id: nextId('answer_translations'),
+        id: await allocateId('answer_translations'),
         answerId: answer.id,
         language: t.language,
         text: t.text,
@@ -102,7 +102,7 @@ answersRouter.post('/:id/translations', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const translation = await answerTranslationRepository.upsert({
-      id: nextId('answer_translations'),
+      id: await allocateId('answer_translations'),
       answerId: id,
       language,
       text,

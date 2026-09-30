@@ -24,6 +24,31 @@ import { InMemoryUserRepository } from './inMemory/user.repository';
 import { InMemoryUserLocationHistoryRepository } from './inMemory/userLocationHistory.repository';
 import { InMemoryUserRoleRepository } from './inMemory/userRole.repository';
 import { InMemoryVendorFeeConfigRepository } from './inMemory/vendorFeeConfig.repository';
+import { PostgresAnswerTranslationRepository } from './postgres/answerTranslation.repository';
+import { PostgresBuybackRepository } from './postgres/buyback.repository';
+import { PostgresBuybackStatusHistoryRepository } from './postgres/buybackStatusHistory.repository';
+import { PostgresBuybackVendorCalculationLogRepository } from './postgres/buybackVendorCalculationLog.repository';
+import { PostgresCatalogRepository } from './postgres/catalog.repository';
+import { PostgresDepreciationConfigRepository } from './postgres/depreciationConfig.repository';
+import { PostgresDepreciationMatrixRepository } from './postgres/depreciationMatrix.repository';
+import { PostgresMasterAnswerRepository } from './postgres/masterAnswer.repository';
+import { PostgresMasterQuestionRepository } from './postgres/masterQuestion.repository';
+import { PostgresOtpRepository } from './postgres/otp.repository';
+import { PostgresPartnerRepository } from './postgres/partner.repository';
+import { PostgresPartnerCategoryVendorMappingRepository } from './postgres/partnerCategoryVendorMapping.repository';
+import { PostgresPartnerLocationRepository } from './postgres/partnerLocation.repository';
+import { PostgresPartnerMarginConfigRepository } from './postgres/partnerMarginConfig.repository';
+import { PostgresQuestionAnswerMappingRepository } from './postgres/questionAnswerMapping.repository';
+import { PostgresQuestionTranslationRepository } from './postgres/questionTranslation.repository';
+import { PostgresQuestionnaireConfigRepository } from './postgres/questionnaireConfig.repository';
+import { PostgresRequestStatusMasterRepository } from './postgres/requestStatusMaster.repository';
+import { PostgresRoleRepository } from './postgres/role.repository';
+import { PostgresSessionRepository } from './postgres/session.repository';
+import { PostgresSkuPricingRepository } from './postgres/skuPricing.repository';
+import { PostgresUserRepository } from './postgres/user.repository';
+import { PostgresUserLocationHistoryRepository } from './postgres/userLocationHistory.repository';
+import { PostgresUserRoleRepository } from './postgres/userRole.repository';
+import { PostgresVendorFeeConfigRepository } from './postgres/vendorFeeConfig.repository';
 import {
   AnswerTranslationRepository,
   BuybackRepository,
@@ -52,47 +77,117 @@ import {
   VendorFeeConfigRepository,
 } from './interfaces';
 
-/**
- * Central place to select the active data driver.
- *
- * Today `DATA_DRIVER=in-memory` is the only supported value. When MySQL
- * support is added, branch on `env.dataDriver === 'mysql'` here and return
- * MySQL-backed implementations of the same interfaces - callers never need
- * to change.
- */
-function assertSupportedDriver() {
-  if (env.dataDriver !== 'in-memory') {
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[repositories] DATA_DRIVER="${env.dataDriver}" is not implemented yet, falling back to in-memory mock data.`,
-    );
-  }
+const usePostgres = env.dataDriver === 'postgres' || env.dataDriver === 'supabase';
+
+if (usePostgres && !env.postgresUrl) {
+  throw new Error(
+    `DATA_DRIVER="${env.dataDriver}" requires POSTGRES_URL (or DATABASE_URL) to be set.`,
+  );
 }
 
-assertSupportedDriver();
+function pick<T>(postgres: T, inMemory: T): T {
+  return usePostgres ? postgres : inMemory;
+}
 
-export const userRepository: UserRepository = new InMemoryUserRepository();
-export const otpRepository: OtpRepository = new InMemoryOtpRepository();
-export const sessionRepository: SessionRepository = new InMemorySessionRepository();
-export const catalogRepository: CatalogRepository = new InMemoryCatalogRepository();
-export const buybackRepository: BuybackRepository = new InMemoryBuybackRepository();
-export const partnerRepository: PartnerRepository = new InMemoryPartnerRepository();
-export const partnerLocationRepository: PartnerLocationRepository = new InMemoryPartnerLocationRepository();
-export const roleRepository: RoleRepository = new InMemoryRoleRepository();
-export const userRoleRepository: UserRoleRepository = new InMemoryUserRoleRepository();
-export const userLocationHistoryRepository: UserLocationHistoryRepository = new InMemoryUserLocationHistoryRepository();
-export const masterQuestionRepository: MasterQuestionRepository = new InMemoryMasterQuestionRepository();
-export const questionTranslationRepository: QuestionTranslationRepository = new InMemoryQuestionTranslationRepository();
-export const masterAnswerRepository: MasterAnswerRepository = new InMemoryMasterAnswerRepository();
-export const answerTranslationRepository: AnswerTranslationRepository = new InMemoryAnswerTranslationRepository();
-export const questionAnswerMappingRepository: QuestionAnswerMappingRepository = new InMemoryQuestionAnswerMappingRepository();
-export const questionnaireConfigRepository: QuestionnaireConfigRepository = new InMemoryQuestionnaireConfigRepository();
-export const partnerCategoryVendorMappingRepository: PartnerCategoryVendorMappingRepository = new InMemoryPartnerCategoryVendorMappingRepository();
-export const skuPricingRepository: SkuPricingRepository = new InMemorySkuPricingRepository();
-export const depreciationConfigRepository: DepreciationConfigRepository = new InMemoryDepreciationConfigRepository();
-export const depreciationMatrixRepository: DepreciationMatrixRepository = new InMemoryDepreciationMatrixRepository();
-export const requestStatusMasterRepository: RequestStatusMasterRepository = new InMemoryRequestStatusMasterRepository();
-export const buybackStatusHistoryRepository: BuybackStatusHistoryRepository = new InMemoryBuybackStatusHistoryRepository();
-export const buybackVendorCalculationLogRepository: BuybackVendorCalculationLogRepository = new InMemoryBuybackVendorCalculationLogRepository();
-export const partnerMarginConfigRepository: PartnerMarginConfigRepository = new InMemoryPartnerMarginConfigRepository();
-export const vendorFeeConfigRepository: VendorFeeConfigRepository = new InMemoryVendorFeeConfigRepository();
+export const userRepository: UserRepository = pick<UserRepository>(
+  new PostgresUserRepository(),
+  new InMemoryUserRepository(),
+);
+export const otpRepository: OtpRepository = pick<OtpRepository>(
+  new PostgresOtpRepository(),
+  new InMemoryOtpRepository(),
+);
+export const sessionRepository: SessionRepository = pick<SessionRepository>(
+  new PostgresSessionRepository(),
+  new InMemorySessionRepository(),
+);
+export const catalogRepository: CatalogRepository = pick<CatalogRepository>(
+  new PostgresCatalogRepository(),
+  new InMemoryCatalogRepository(),
+);
+export const buybackRepository: BuybackRepository = pick<BuybackRepository>(
+  new PostgresBuybackRepository(),
+  new InMemoryBuybackRepository(),
+);
+export const partnerRepository: PartnerRepository = pick<PartnerRepository>(
+  new PostgresPartnerRepository(),
+  new InMemoryPartnerRepository(),
+);
+export const partnerLocationRepository: PartnerLocationRepository = pick<PartnerLocationRepository>(
+  new PostgresPartnerLocationRepository(),
+  new InMemoryPartnerLocationRepository(),
+);
+export const roleRepository: RoleRepository = pick<RoleRepository>(
+  new PostgresRoleRepository(),
+  new InMemoryRoleRepository(),
+);
+export const userRoleRepository: UserRoleRepository = pick<UserRoleRepository>(
+  new PostgresUserRoleRepository(),
+  new InMemoryUserRoleRepository(),
+);
+export const userLocationHistoryRepository: UserLocationHistoryRepository = pick<UserLocationHistoryRepository>(
+  new PostgresUserLocationHistoryRepository(),
+  new InMemoryUserLocationHistoryRepository(),
+);
+export const masterQuestionRepository: MasterQuestionRepository = pick<MasterQuestionRepository>(
+  new PostgresMasterQuestionRepository(),
+  new InMemoryMasterQuestionRepository(),
+);
+export const questionTranslationRepository: QuestionTranslationRepository = pick<QuestionTranslationRepository>(
+  new PostgresQuestionTranslationRepository(),
+  new InMemoryQuestionTranslationRepository(),
+);
+export const masterAnswerRepository: MasterAnswerRepository = pick<MasterAnswerRepository>(
+  new PostgresMasterAnswerRepository(),
+  new InMemoryMasterAnswerRepository(),
+);
+export const answerTranslationRepository: AnswerTranslationRepository = pick<AnswerTranslationRepository>(
+  new PostgresAnswerTranslationRepository(),
+  new InMemoryAnswerTranslationRepository(),
+);
+export const questionAnswerMappingRepository: QuestionAnswerMappingRepository = pick<QuestionAnswerMappingRepository>(
+  new PostgresQuestionAnswerMappingRepository(),
+  new InMemoryQuestionAnswerMappingRepository(),
+);
+export const questionnaireConfigRepository: QuestionnaireConfigRepository = pick<QuestionnaireConfigRepository>(
+  new PostgresQuestionnaireConfigRepository(),
+  new InMemoryQuestionnaireConfigRepository(),
+);
+export const partnerCategoryVendorMappingRepository: PartnerCategoryVendorMappingRepository =
+  pick<PartnerCategoryVendorMappingRepository>(
+    new PostgresPartnerCategoryVendorMappingRepository(),
+    new InMemoryPartnerCategoryVendorMappingRepository(),
+  );
+export const skuPricingRepository: SkuPricingRepository = pick<SkuPricingRepository>(
+  new PostgresSkuPricingRepository(),
+  new InMemorySkuPricingRepository(),
+);
+export const depreciationConfigRepository: DepreciationConfigRepository = pick<DepreciationConfigRepository>(
+  new PostgresDepreciationConfigRepository(),
+  new InMemoryDepreciationConfigRepository(),
+);
+export const depreciationMatrixRepository: DepreciationMatrixRepository = pick<DepreciationMatrixRepository>(
+  new PostgresDepreciationMatrixRepository(),
+  new InMemoryDepreciationMatrixRepository(),
+);
+export const requestStatusMasterRepository: RequestStatusMasterRepository = pick<RequestStatusMasterRepository>(
+  new PostgresRequestStatusMasterRepository(),
+  new InMemoryRequestStatusMasterRepository(),
+);
+export const buybackStatusHistoryRepository: BuybackStatusHistoryRepository = pick<BuybackStatusHistoryRepository>(
+  new PostgresBuybackStatusHistoryRepository(),
+  new InMemoryBuybackStatusHistoryRepository(),
+);
+export const buybackVendorCalculationLogRepository: BuybackVendorCalculationLogRepository =
+  pick<BuybackVendorCalculationLogRepository>(
+    new PostgresBuybackVendorCalculationLogRepository(),
+    new InMemoryBuybackVendorCalculationLogRepository(),
+  );
+export const partnerMarginConfigRepository: PartnerMarginConfigRepository = pick<PartnerMarginConfigRepository>(
+  new PostgresPartnerMarginConfigRepository(),
+  new InMemoryPartnerMarginConfigRepository(),
+);
+export const vendorFeeConfigRepository: VendorFeeConfigRepository = pick<VendorFeeConfigRepository>(
+  new PostgresVendorFeeConfigRepository(),
+  new InMemoryVendorFeeConfigRepository(),
+);

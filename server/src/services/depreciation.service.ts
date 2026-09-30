@@ -1,6 +1,6 @@
 import { depreciationConfigRepository, depreciationMatrixRepository, questionAnswerMappingRepository } from '../repositories';
 import { DepreciationConfig, DepreciationMatrixEntry } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 
 export interface DepreciationEntryInput {
   questionAnswerId: number;
@@ -89,7 +89,7 @@ export const depreciationService = {
     }
 
     const config = await depreciationConfigRepository.create({
-      id: nextId('depreciation_config'),
+      id: await allocateId('depreciation_config'),
       productCategoryId,
       brandId,
       vendorId,
@@ -103,7 +103,7 @@ export const depreciationService = {
     const matrix: DepreciationMatrixEntry[] = [];
     for (const entry of entries) {
       const row = await depreciationMatrixRepository.create({
-        id: nextId('depreciation_matrix'),
+        id: await allocateId('depreciation_matrix'),
         depreciationConfigId: config.id,
         questionAnswerId: entry.questionAnswerId,
         depreciationType: entry.depreciationType,

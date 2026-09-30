@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { partnerLocationRepository, partnerRepository } from '../repositories';
 import { PartnerLocation } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const partnerLocationsRouter = Router();
@@ -52,7 +52,7 @@ partnerLocationsRouter.post('/', async (req, res, next) => {
 
     const now = new Date().toISOString();
     const location: PartnerLocation = {
-      id: nextId('partner_locations'),
+      id: await allocateId('partner_locations'),
       partnerId: partnerId!,
       name: body.name!,
       address: body.address!,

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { masterAnswerRepository, masterQuestionRepository, questionAnswerMappingRepository } from '../repositories';
 import { QuestionAnswerMapping } from '../types/domain';
-import { nextId } from '../utils/idGenerator';
+import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const questionAnswersRouter = Router();
@@ -38,7 +38,7 @@ questionAnswersRouter.post('/', async (req, res, next) => {
     if (duplicate) return res.status(200).json(duplicate);
 
     const now = new Date().toISOString();
-    const mapping: QuestionAnswerMapping = { id: nextId('question_answer_mapping'), questionId, answerId, createdAt: now, updatedAt: now, isActive: true };
+    const mapping: QuestionAnswerMapping = { id: await allocateId('question_answer_mapping'), questionId, answerId, createdAt: now, updatedAt: now, isActive: true };
     await questionAnswerMappingRepository.create(mapping);
     return res.status(201).json(mapping);
   } catch (err) {
