@@ -52,7 +52,7 @@ export function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const completed = history.filter((h) => h.status === 'completed');
+  const completedCount = history.filter((h) => h.status === 'completed').length;
   const inProgress = history.filter((h) => h.status in RESUME_ROUTE);
 
   const handleStartNewBuyback = () => {
@@ -80,7 +80,7 @@ export function DashboardPage() {
         <span className="dashboard-cta__arrow">→</span>
       </Card>
 
-      {loading && <Spinner label="Loading your history…" />}
+      {loading && <Spinner label="Loading your requests…" />}
       {error && <Banner tone="error">{error}</Banner>}
 
       {!loading && inProgress.length > 0 && (
@@ -107,33 +107,17 @@ export function DashboardPage() {
       )}
 
       {!loading && (
-        <section>
-          <h3 className="dashboard-section-title">History</h3>
-          {completed.length === 0 ? (
-            <Banner tone="info">Your completed buyback requests will show up here.</Banner>
-          ) : (
-            <div className="dashboard-list">
-              {completed.map((request) => (
-                <Card
-                  key={request.id}
-                  interactive={Boolean(request.receiptUrl)}
-                  onClick={request.receiptUrl ? () => navigate(`/buyback/${request.id}/receipt`) : undefined}
-                >
-                  <div className="dashboard-list__row">
-                    <div>
-                      <strong>{request.referenceId}</strong>
-                      <p>
-                        {request.product?.name} · {request.sku?.label}
-                        {request.receiptUrl ? ' · View receipt' : ''}
-                      </p>
-                    </div>
-                    <span className="dashboard-list__value">₹{request.finalValue}</span>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
+        <Card interactive onClick={() => navigate('/history')} className="dashboard-history-link">
+          <div>
+            <h2>View all request</h2>
+            <p>
+              {completedCount === 0
+                ? 'Browse your completed buyback requests.'
+                : `${completedCount} completed request${completedCount === 1 ? '' : 's'}`}
+            </p>
+          </div>
+          <span className="dashboard-cta__arrow">→</span>
+        </Card>
       )}
     </PageShell>
   );
