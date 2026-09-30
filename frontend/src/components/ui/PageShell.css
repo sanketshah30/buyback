@@ -1,12 +1,14 @@
 .page-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
   background: var(--color-bg);
   position: relative;
+  overflow: hidden;
 }
 
 .page-shell__header {
@@ -57,7 +59,8 @@
 
 .page-shell__content {
   flex: 1;
-  padding: 16px 20px 32px;
+  min-height: 0;
+  padding: 16px 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -65,10 +68,9 @@
 }
 
 .page-shell__footer {
-  position: sticky;
-  bottom: 0;
-  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--color-bg) 60%, transparent);
+  flex-shrink: 0;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: var(--color-bg);
   display: flex;
   flex-direction: column;
   gap: 10px;

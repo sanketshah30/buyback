@@ -1,4 +1,6 @@
 .document-proof-page {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
@@ -7,17 +9,17 @@
   font-size: 0.75rem;
 }
 
+.document-proof-page__doc-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
 .document-proof-page__doc {
   aspect-ratio: auto;
   height: 96px;
-  gap: 4px;
-}
-
-.document-proof-page__doc .upload-slot__label {
-  font-size: 0.7rem;
-  padding: 0 10px;
-  text-align: center;
-  line-height: 1.25;
+  width: 100%;
 }
 
 .document-proof-page__icon {
@@ -25,22 +27,31 @@
   line-height: 1;
 }
 
-.document-proof-page .upload-grid {
-  gap: 6px;
+.document-proof-page__grid {
+  gap: 6px 6px;
 }
 
-.document-proof-page .upload-slot {
-  gap: 2px;
+.document-proof-page__side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.document-proof-page__side .upload-slot {
+  width: 100%;
   border-radius: var(--radius-sm);
 }
 
-.document-proof-page .upload-slot__label {
+/* Labels live under the thumbnail — never overlaid on the image. */
+.document-proof-page__caption {
   font-size: 0.68rem;
-}
-
-.document-proof-page .upload-slot--filled .upload-slot__label {
-  bottom: 4px;
-  padding: 1px 6px;
-  border-radius: 12px;
-  font-size: 0.65rem;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
 }

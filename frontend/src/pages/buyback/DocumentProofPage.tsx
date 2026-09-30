@@ -86,46 +86,50 @@ export function DocumentProofPage() {
 
         <section>
           <h3 className="section-label">Document proof</h3>
-          <label className="upload-slot document-proof-page__doc">
-            {document ? (
-              <img src={URL.createObjectURL(document)} alt="Document proof" />
-            ) : (
-              <span className="document-proof-page__icon">🪪</span>
-            )}
-            <span className="upload-slot__label">
+          <label className="document-proof-page__doc-wrap">
+            <span className={`upload-slot document-proof-page__doc ${document ? 'upload-slot--filled' : ''}`}>
+              {document ? (
+                <img src={URL.createObjectURL(document)} alt="Document proof" />
+              ) : (
+                <span className="document-proof-page__icon">🪪</span>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setDocument(e.target.files?.[0] ?? null)}
+              />
+            </span>
+            <span className="document-proof-page__caption">
               {document ? document.name : 'Tap to upload ID or invoice'}
             </span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => setDocument(e.target.files?.[0] ?? null)}
-            />
           </label>
         </section>
 
         {needsProductImages && (
           <section>
             <h3 className="section-label">6-side device images</h3>
-            <div className="upload-grid">
+            <div className="upload-grid document-proof-page__grid">
               {SIDES.map((side) => {
                 const file = productImages[side.id];
                 return (
-                  <label key={side.id} className={`upload-slot ${file ? 'upload-slot--filled' : ''}`}>
-                    {file ? (
-                      <img src={URL.createObjectURL(file)} alt={side.label} />
-                    ) : (
-                      <span className="document-proof-page__icon">📷</span>
-                    )}
-                    <span className="upload-slot__label">{side.label}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) =>
-                        setProductImages((prev) => ({ ...prev, [side.id]: e.target.files?.[0] ?? null }))
-                      }
-                    />
+                  <label key={side.id} className="document-proof-page__side">
+                    <span className={`upload-slot ${file ? 'upload-slot--filled' : ''}`}>
+                      {file ? (
+                        <img src={URL.createObjectURL(file)} alt={side.label} />
+                      ) : (
+                        <span className="document-proof-page__icon">📷</span>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) =>
+                          setProductImages((prev) => ({ ...prev, [side.id]: e.target.files?.[0] ?? null }))
+                        }
+                      />
+                    </span>
+                    <span className="document-proof-page__caption">{side.label}</span>
                   </label>
                 );
               })}
