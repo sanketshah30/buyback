@@ -121,6 +121,31 @@ export async function assertObjectExists(pathname: string): Promise<void> {
   }
 }
 
+/**
+ * Move a multer temp file into Blob (or local disk) under
+ * `buybacks/<id>/<kind>/…` and return the stored pathname.
+ */
+export async function ingestMulterFile(
+  buybackId: number | string,
+  kind: UploadKind,
+  file: Express.Multer.File,
+): Promise<string> {
+  const ext = path.extname(file.originalname).toLowerCase() || path.extname(file.filename) || '.bin';
+  const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+  const pathname = buildObjectPathname(buybackId, kind, filename);
+  const buffer = fs.readFileSync(file.path);
+  try {
+    await putObject(pathname, buffer, file.mimetype || EXTENSION_CONTENT_TYPES[ext] || 'application/octet-stream');
+  } finally {
+    try {
+      fs.unlinkSync(file.path);
+    } catch {
+      // temp file may already be gone
+    }
+  }
+  return pathname;
+}
+
 export async function putObject(
   pathname: string,
   body: Buffer | ReadableStream | Blob | ArrayBuffer | string,

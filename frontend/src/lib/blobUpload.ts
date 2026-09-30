@@ -30,6 +30,14 @@ function randomName(originalName: string, forceJpeg?: boolean): string {
   return `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
 }
 
+function requirePathname(pathname: string | undefined | null, label: string): string {
+  const value = typeof pathname === 'string' ? pathname.trim() : '';
+  if (!value) {
+    throw new ApiError(`${label} upload finished without a storage pathname. Refresh the app and try again.`, 500);
+  }
+  return value;
+}
+
 /**
  * Uploads one file for a buyback (Blob client upload when configured, else
  * local multipart fallback). Photos are resized first. Returns the stored
@@ -66,7 +74,7 @@ export async function uploadBuybackFile(
             })
         : undefined,
     });
-    return result.pathname;
+    return requirePathname(result.pathname, kind);
   }
 
   // Local disk fallback (no BLOB_READ_WRITE_TOKEN)
@@ -77,7 +85,7 @@ export async function uploadBuybackFile(
   onProgress?.({ loaded: 0, total: prepared.size, percentage: 0 });
   const res = await api.upload<{ pathname: string }>('/api/uploads/local', form);
   onProgress?.({ loaded: prepared.size, total: prepared.size, percentage: 100 });
-  return res.pathname;
+  return requirePathname(res.pathname, kind);
 }
 
 export async function uploadBuybackFiles(

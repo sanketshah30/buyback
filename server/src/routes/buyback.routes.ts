@@ -3,6 +3,7 @@ import { REQUEST_STATUS_AMOUNT_CALCULATED_ID, REQUEST_STATUS_BUYBACK_ACCEPTED_ID
 import { catalogRepository, buybackRepository, buybackStatusHistoryRepository, buybackVendorCalculationLogRepository, partnerLocationRepository, partnerRepository, questionnaireConfigRepository, userRepository } from '../repositories';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
 import { requireRight } from '../middleware/rights.middleware';
+import { optionalArray, optionalSingle } from '../middleware/upload.middleware';
 import { ResolvedQuestionnaireQuestion } from '../repositories/interfaces';
 import { assessmentService } from '../services/assessment.service';
 import { authService } from '../services/auth.service';
@@ -11,6 +12,7 @@ import { diagnosisService } from '../services/diagnosis.service';
 import { emailService } from '../services/email.service';
 import { notificationService } from '../services/notification.service';
 import { generatePurchaseReceipt } from '../services/receipt.service';
+import { ingestMulterFile } from '../services/blobStorage.service';
 import { applyDiagnosisAdjustment, applyNoDiagnosisDrop } from '../services/valuation.service';
 import { BuybackRequest, PartnerLocation, QuestionnaireAnswer } from '../types/domain';
 import { nextId } from '../utils/idGenerator';
@@ -222,18 +224,30 @@ buybackRouter.post('/:id/assessment/questionnaire', async (req: AuthedRequest, r
   }
 });
 
-buybackRouter.post('/:id/assessment/images', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+buybackRouter.post(
+  '/:id/assessment/images',
+  requireOwnedBuybackForUpload,
+  optionalArray('images', 6),
+  async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
     const location = await resolvePromoterLocation(req.auth!.userId);
-    const incoming = asPathnameList(req.body ?? {});
-    if (incoming.length < 1) {
-      return res.status(400).json({
-        error: 'At least one image pathname is required (6 recommended: front, back, top, bottom, left, right)',
-      });
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    let pathnames: string[];
+    if (files.length > 0) {
+      pathnames = [];
+      for (const file of files) {
+        pathnames.push(await ingestMulterFile(request.id, 'assessment', file));
+      }
+    } else {
+      const incoming = asPathnameList(req.body ?? {});
+      if (incoming.length < 1) {
+        return res.status(400).json({
+          error: 'At least one image pathname is required (6 recommended: front, back, top, bottom, left, right)',
+        });
+      }
+      pathnames = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
     }
-
-    const pathnames = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
     const replace = String(req.query.replace ?? '1') !== '0';
     const assessmentImageUrls = replace
       ? pathnames
@@ -254,14 +268,22 @@ buybackRouter.post('/:id/assessment/images', requireOwnedBuybackForUpload, async
   }
 });
 
-buybackRouter.post('/:id/assessment/video', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+buybackRouter.post(
+  '/:id/assessment/video',
+  requireOwnedBuybackForUpload,
+  optionalSingle('video'),
+  async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
     const location = await resolvePromoterLocation(req.auth!.userId);
-    const incoming = asPathnameList(req.body ?? {});
-    if (incoming.length !== 1) return res.status(400).json({ error: 'A video pathname is required' });
-
-    const [pathname] = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    let pathname: string;
+    if (req.file) {
+      pathname = await ingestMulterFile(request.id, 'video', req.file);
+    } else {
+      const incoming = asPathnameList(req.body ?? {});
+      if (incoming.length !== 1) return res.status(400).json({ error: 'A video pathname is required' });
+      [pathname] = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    }
     const questions = await resolveQuestionnaireFor(request, location);
     const aiAssessment = assessmentService.runVideoAssessment(questions);
 
@@ -482,13 +504,26 @@ buybackRouter.post('/:id/customer/verify-otp', async (req: AuthedRequest, res, n
   }
 });
 
-buybackRouter.post('/:id/documents', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+buybackRouter.post(
+  '/:id/documents',
+  requireOwnedBuybackForUpload,
+  optionalSingle('document'),
+  async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-    const incoming = asPathnameList(req.body ?? {});
-    if (incoming.length !== 1) return res.status(400).json({ error: 'A document pathname is required' });
+    let pathname: string;
+    if (req.file) {
+      pathname = await ingestMulterFile(request.id, 'document', req.file);
+    } else {
+      const incoming = asPathnameList(req.body ?? {});
+      if (incoming.length !== 1) {
+        return res.status(400).json({
+          error: 'A document pathname is required. Refresh the app to update, then try again.',
+        });
+      }
+      [pathname] = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    }
 
-    const [pathname] = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
     const requiresProductImages = request.assessmentMethod === 'questionnaire';
     const updated = await buybackRepository.update(request.id, {
       documentProofUrl: pathname,
@@ -500,13 +535,28 @@ buybackRouter.post('/:id/documents', requireOwnedBuybackForUpload, async (req: A
   }
 });
 
-buybackRouter.post('/:id/product-images', requireOwnedBuybackForUpload, async (req: AuthedRequest, res, next) => {
+buybackRouter.post(
+  '/:id/product-images',
+  requireOwnedBuybackForUpload,
+  optionalArray('images', 6),
+  async (req: AuthedRequest, res, next) => {
   try {
     const request = await loadOwnedBuyback(req.params.id, req.auth!.userId);
-    const incoming = asPathnameList(req.body ?? {});
-    if (incoming.length < 1) return res.status(400).json({ error: 'At least one product image pathname is required' });
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    let pathnames: string[];
+    if (files.length > 0) {
+      pathnames = [];
+      for (const file of files) {
+        pathnames.push(await ingestMulterFile(request.id, 'product', file));
+      }
+    } else {
+      const incoming = asPathnameList(req.body ?? {});
+      if (incoming.length < 1) {
+        return res.status(400).json({ error: 'At least one product image pathname is required' });
+      }
+      pathnames = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
+    }
 
-    const pathnames = await verifyBuybackPathnames(request.id, req.auth!.userId, incoming);
     const replace = String(req.query.replace ?? '1') !== '0';
     const productImageUrls = replace ? pathnames : [...(request.productImageUrls ?? []), ...pathnames];
 

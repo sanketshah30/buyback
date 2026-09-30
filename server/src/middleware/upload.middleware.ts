@@ -1,7 +1,7 @@
 import fs from 'fs';
 import multer, { FileFilterCallback } from 'multer';
 import path from 'path';
-import { Request } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import {
   ALLOWED_EXTENSIONS,
   VIDEO_MAX_BYTES,
@@ -9,9 +9,11 @@ import {
 } from '../services/blobStorage.service';
 
 /**
- * Local-disk multer adapter used only when `BLOB_READ_WRITE_TOKEN` is unset
- * (local/dev fallback). Production on Vercel should use private Blob client
- * uploads via POST /api/uploads/token - see routes/uploads.routes.ts.
+ * Multer adapter for:
+ * - Local-disk fallback (`POST /api/uploads/local`) when Blob is unset
+ * - Legacy multipart on buyback routes (stale PWA clients) which then `putObject` to Blob
+ *
+ * Prefer client Blob uploads via `POST /api/uploads/token` in production.
  */
 
 const ALLOWED_MIME_PREFIXES = ['image/', 'video/'];
@@ -48,3 +50,22 @@ export const upload = multer({
   limits: { fileSize: VIDEO_MAX_BYTES },
   fileFilter,
 });
+
+/** Run multer only when the request is actually multipart (JSON pathname clients skip it). */
+export function optionalSingle(field: string) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if ((req.headers['content-type'] || '').includes('multipart/form-data')) {
+      return upload.single(field)(req, res, next);
+    }
+    return next();
+  };
+}
+
+export function optionalArray(field: string, maxCount: number) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if ((req.headers['content-type'] || '').includes('multipart/form-data')) {
+      return upload.array(field, maxCount)(req, res, next);
+    }
+    return next();
+  };
+}
