@@ -52,7 +52,6 @@ export function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const completedCount = history.filter((h) => h.status === 'completed').length;
   const inProgress = history.filter((h) => h.status in RESUME_ROUTE);
 
   const handleStartNewBuyback = () => {
@@ -98,7 +97,9 @@ export function DashboardPage() {
                     <strong>{request.product?.name ?? request.category?.name ?? 'Buyback request'}</strong>
                     <p>{STATUS_LABELS[request.status] ?? request.status}</p>
                   </div>
-                  {request.maxValue !== undefined && <span className="dashboard-list__value">₹{request.maxValue}</span>}
+                  {(request.finalValue ?? request.maxValue) !== undefined && (
+                    <span className="dashboard-list__value">₹{request.finalValue ?? request.maxValue}</span>
+                  )}
                 </div>
               </Card>
             ))}
@@ -108,15 +109,10 @@ export function DashboardPage() {
 
       {!loading && (
         <Card interactive onClick={() => navigate('/history')} className="dashboard-history-link">
-          <div>
-            <h2>View all request</h2>
-            <p>
-              {completedCount === 0
-                ? 'Browse your completed buyback requests.'
-                : `${completedCount} completed request${completedCount === 1 ? '' : 's'}`}
-            </p>
-          </div>
-          <span className="dashboard-cta__arrow">→</span>
+          <h2>View all request</h2>
+          <span className="dashboard-cta__arrow" aria-hidden>
+            →
+          </span>
         </Card>
       )}
     </PageShell>

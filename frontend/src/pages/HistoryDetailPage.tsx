@@ -4,13 +4,26 @@ import { Button } from '../components/ui/Button';
 import { PageShell } from '../components/ui/PageShell';
 import { Spinner } from '../components/ui/Spinner';
 import { useBuyback } from '../hooks/useBuyback';
+import './HistoryDetailPage.css';
 
 function formatDate(iso?: string) {
-  if (!iso) return '-';
+  if (!iso) return '—';
   return new Date(iso).toLocaleString('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
+}
+
+function DetailRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="history-detail__row">
+      <span className="history-detail__label">{label}</span>
+      <span className="history-detail__value">{value?.trim() ? value : '—'}</span>
+    </div>
+  );
 }
 
 export function HistoryDetailPage() {
@@ -34,80 +47,42 @@ export function HistoryDetailPage() {
     );
   }
 
+  const deviceLine = [data.brand?.name, data.product?.name].filter(Boolean).join(' · ') || '—';
+  const idLabel = data.identifier?.type === 'serial' ? 'Serial' : 'IMEI';
+
   return (
     <PageShell
       title="Buyback details"
-      subtitle={data.referenceId ? `Request ${data.referenceId}` : undefined}
       footer={
         data.receiptUrl ? (
           <Button onClick={() => navigate(`/buyback/${data.id}/receipt`)}>View purchase receipt</Button>
         ) : undefined
       }
     >
-      <section>
-        <h3 className="section-label">Request</h3>
-        <div className="summary-list">
-          <div className="summary-row">
-            <span className="summary-row__label">Reference</span>
-            <span className="summary-row__value">{data.referenceId ?? `#${data.id}`}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">Status</span>
-            <span className="summary-row__value">Completed</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">Completed</span>
-            <span className="summary-row__value">{formatDate(data.completedAt ?? data.updatedAt)}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">Final value</span>
-            <span className="summary-row__value">
-              {data.finalValue !== undefined ? `₹${data.finalValue}` : '-'}
-            </span>
-          </div>
+      <header className="history-detail__hero">
+        <div className="history-detail__hero-top">
+          <span className="history-detail__ref">{data.referenceId ?? `#${data.id}`}</span>
+          <span className="history-detail__badge">Completed</span>
         </div>
+        <p className="history-detail__amount">
+          {data.finalValue !== undefined ? `₹${data.finalValue}` : '—'}
+        </p>
+        <p className="history-detail__meta">{formatDate(data.completedAt ?? data.updatedAt)}</p>
+      </header>
+
+      <section className="history-detail__card">
+        <h3 className="history-detail__card-title">Device</h3>
+        <DetailRow label="Product" value={deviceLine} />
+        <DetailRow label="Category" value={data.category?.name} />
+        <DetailRow label="SKU" value={data.sku?.label} />
+        <DetailRow label={idLabel} value={data.identifier?.value} />
       </section>
 
-      <section>
-        <h3 className="section-label">Device</h3>
-        <div className="summary-list">
-          <div className="summary-row">
-            <span className="summary-row__label">Category</span>
-            <span className="summary-row__value">{data.category?.name ?? '-'}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">Brand / Product</span>
-            <span className="summary-row__value">
-              {[data.brand?.name, data.product?.name].filter(Boolean).join(' · ') || '-'}
-            </span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">SKU</span>
-            <span className="summary-row__value">{data.sku?.label ?? '-'}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">{data.identifier?.type === 'serial' ? 'Serial number' : 'IMEI'}</span>
-            <span className="summary-row__value">{data.identifier?.value ?? '-'}</span>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h3 className="section-label">Customer</h3>
-        <div className="summary-list">
-          <div className="summary-row">
-            <span className="summary-row__label">Name</span>
-            <span className="summary-row__value">{data.customer?.name ?? '-'}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">Mobile</span>
-            <span className="summary-row__value">{data.customer?.mobile ?? '-'}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-row__label">Email</span>
-            <span className="summary-row__value">{data.customer?.email ?? '-'}</span>
-          </div>
-        </div>
+      <section className="history-detail__card">
+        <h3 className="history-detail__card-title">Customer</h3>
+        <DetailRow label="Name" value={data.customer?.name} />
+        <DetailRow label="Mobile" value={data.customer?.mobile} />
+        <DetailRow label="Email" value={data.customer?.email} />
       </section>
 
       {!data.receiptUrl && (
