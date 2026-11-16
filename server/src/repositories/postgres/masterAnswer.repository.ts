@@ -1,32 +1,44 @@
+import { getSql } from '../../db/postgres';
 import { MasterAnswer } from '../../types/domain';
 import { MasterAnswerRepository } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity } from './helpers';
 
-const store = new JsonDocStore<MasterAnswer>('master_answers');
+const answers = new EntityTable<MasterAnswer>(
+  'answers',
+  'Master answer',
+  (row) => ({ ...mapBaseEntity(row), code: String(row.code) }),
+  (a) => ({ ...baseEntityColumns(a), code: a.code }),
+);
 
 export class PostgresMasterAnswerRepository implements MasterAnswerRepository {
   async create(answer: MasterAnswer): Promise<MasterAnswer> {
-    return store.insert(answer);
+    return answers.insert(answer);
   }
 
   async update(id: number, patch: Partial<MasterAnswer>): Promise<MasterAnswer> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('Master answer', id);
-    const updated: MasterAnswer = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return answers.update(id, patch);
   }
 
   async findById(id: number): Promise<MasterAnswer | undefined> {
-    return store.get(id);
+    return answers.get(id);
   }
 
   async findByCode(code: string): Promise<MasterAnswer | undefined> {
-    return store.findByJsonText('code', code);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM answers WHERE code = ${code} ORDER BY is_active DESC, id LIMIT 1
+    `;
+    return rows[0] ? answers.fromRow(rows[0]) : undefined;
   }
 
   async list(filter?: { isActive?: boolean }): Promise<MasterAnswer[]> {
-    let result = await store.listAll();
-    if (filter?.isActive !== undefined) result = result.filter((a) => a.isActive === filter.isActive);
-    return result;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM answers
+      WHERE true
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return answers.mapRows(rows);
   }
 }

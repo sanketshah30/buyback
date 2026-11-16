@@ -34,11 +34,11 @@ import {
 /**
  * Repository contracts for the buyback platform's data layer.
  *
- * The MVP ships an in-memory implementation (`./inMemory`) so the whole
- * product flow can be exercised with mock data. To move to MySQL later,
- * implement each interface against `mysql2`/an ORM and swap the wiring in
- * `src/repositories/index.ts` - nothing above the repository layer needs to
- * change.
+ * Two implementations ship today:
+ * - `./inMemory` — Map-backed mock for local demos (`DATA_DRIVER=in-memory`)
+ * - `./postgres` — normalized Postgres tables + FKs (`DATA_DRIVER=postgres|supabase`)
+ *
+ * Routes/services depend only on these interfaces; swap drivers via env.
  */
 
 export interface UserRepository {

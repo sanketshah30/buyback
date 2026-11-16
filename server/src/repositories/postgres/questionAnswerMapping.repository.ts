@@ -1,32 +1,50 @@
+import { getSql } from '../../db/postgres';
 import { QuestionAnswerMapping } from '../../types/domain';
 import { QuestionAnswerMappingRepository } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity, toNum } from './helpers';
 
-const store = new JsonDocStore<QuestionAnswerMapping>('question_answer_mappings');
+const mappings = new EntityTable<QuestionAnswerMapping>(
+  'question_answer_mapping',
+  'Question answer mapping',
+  (row) => ({
+    ...mapBaseEntity(row),
+    questionId: toNum(row.question_id),
+    answerId: toNum(row.answer_id),
+  }),
+  (m) => ({ ...baseEntityColumns(m), question_id: m.questionId, answer_id: m.answerId }),
+);
 
 export class PostgresQuestionAnswerMappingRepository implements QuestionAnswerMappingRepository {
   async create(mapping: QuestionAnswerMapping): Promise<QuestionAnswerMapping> {
-    return store.insert(mapping);
+    return mappings.insert(mapping);
   }
 
   async update(id: number, patch: Partial<QuestionAnswerMapping>): Promise<QuestionAnswerMapping> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('Question answer mapping', id);
-    const updated: QuestionAnswerMapping = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return mappings.update(id, patch);
   }
 
   async findById(id: number): Promise<QuestionAnswerMapping | undefined> {
-    return store.get(id);
+    return mappings.get(id);
   }
 
   async listByQuestion(questionId: number): Promise<QuestionAnswerMapping[]> {
-    return (await store.findByJsonInt('questionId', questionId)).filter((m) => m.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM question_answer_mapping
+      WHERE question_id = ${questionId} AND is_active = true
+      ORDER BY id
+    `;
+    return mappings.mapRows(rows);
   }
 
   async list(filter?: { isActive?: boolean }): Promise<QuestionAnswerMapping[]> {
-    let result = await store.listAll();
-    if (filter?.isActive !== undefined) result = result.filter((m) => m.isActive === filter.isActive);
-    return result;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM question_answer_mapping
+      WHERE true
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return mappings.mapRows(rows);
   }
 }

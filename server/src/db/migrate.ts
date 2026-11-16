@@ -10,6 +10,10 @@ async function migrate(): Promise<void> {
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   const sql = getMigrateSql();
+  // eslint-disable-next-line no-console
+  console.log(
+    'Applying production relational schema (DROPs existing buyback tables — re-seed afterward).',
+  );
   await sql.unsafe(schema);
   // eslint-disable-next-line no-console
   console.log('Migration complete: schema.sql applied.');

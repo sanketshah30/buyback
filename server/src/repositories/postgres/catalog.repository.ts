@@ -1,37 +1,110 @@
+import { getSql } from '../../db/postgres';
 import { Brand, Category, Product, Sku, SkuAlias } from '../../types/domain';
 import { CatalogRepository } from '../interfaces';
-import { JsonDocStore } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity, toNum } from './helpers';
 
-const categories = new JsonDocStore<Category>('categories');
-const brands = new JsonDocStore<Brand>('brands');
-const products = new JsonDocStore<Product>('products');
-const skus = new JsonDocStore<Sku>('skus');
-const skuAliases = new JsonDocStore<SkuAlias>('sku_aliases');
+const categories = new EntityTable<Category>(
+  'categories',
+  'Category',
+  (row) => ({
+    ...mapBaseEntity(row),
+    name: String(row.name),
+    type: row.type as Category['type'],
+  }),
+  (c) => ({ ...baseEntityColumns(c), name: c.name, type: c.type }),
+);
+
+const brands = new EntityTable<Brand>(
+  'brands',
+  'Brand',
+  (row) => ({ ...mapBaseEntity(row), name: String(row.name) }),
+  (b) => ({ ...baseEntityColumns(b), name: b.name }),
+);
+
+const products = new EntityTable<Product>(
+  'products',
+  'Product',
+  (row) => ({
+    ...mapBaseEntity(row),
+    categoryId: toNum(row.category_id),
+    brandId: toNum(row.brand_id),
+    name: String(row.name),
+  }),
+  (p) => ({ ...baseEntityColumns(p), category_id: p.categoryId, brand_id: p.brandId, name: p.name }),
+);
+
+const skus = new EntityTable<Sku>(
+  'skus',
+  'SKU',
+  (row) => ({
+    ...mapBaseEntity(row),
+    productId: toNum(row.product_id),
+    code: String(row.code),
+    label: String(row.label),
+  }),
+  (s) => ({ ...baseEntityColumns(s), product_id: s.productId, code: s.code, label: s.label }),
+);
+
+const skuAliases = new EntityTable<SkuAlias>(
+  'sku_aliases',
+  'SKU alias',
+  (row) => ({
+    ...mapBaseEntity(row),
+    skuId: toNum(row.sku_id),
+    partnerId: String(row.partner_id),
+    partnerSkuName: String(row.partner_sku_name),
+  }),
+  (a) => ({
+    ...baseEntityColumns(a),
+    sku_id: a.skuId,
+    partner_id: a.partnerId,
+    partner_sku_name: a.partnerSkuName,
+  }),
+);
 
 export class PostgresCatalogRepository implements CatalogRepository {
   async listCategories(): Promise<Category[]> {
-    return (await categories.listAll()).filter((c) => c.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`SELECT * FROM categories WHERE is_active = true ORDER BY id`;
+    return categories.mapRows(rows);
   }
 
   async listBrandsByCategory(categoryId: number): Promise<Brand[]> {
-    const categoryProducts = await products.findByJsonInt('categoryId', categoryId);
-    const brandIds = new Set<number>();
-    for (const product of categoryProducts) {
-      if (product.isActive) brandIds.add(product.brandId);
-    }
-    return (await brands.listAll()).filter((b) => brandIds.has(b.id) && b.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT DISTINCT b.*
+      FROM brands b
+      JOIN products p ON p.brand_id = b.id
+      WHERE p.category_id = ${categoryId} AND p.is_active = true AND b.is_active = true
+      ORDER BY b.id
+    `;
+    return brands.mapRows(rows);
   }
 
   async listProducts(categoryId: number, brandId: number): Promise<Product[]> {
-    return (await products.findByJsonIntPair('categoryId', categoryId, 'brandId', brandId)).filter((p) => p.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM products
+      WHERE category_id = ${categoryId} AND brand_id = ${brandId} AND is_active = true
+      ORDER BY id
+    `;
+    return products.mapRows(rows);
   }
 
   async listSkus(productId: number): Promise<Sku[]> {
-    return (await skus.findByJsonInt('productId', productId)).filter((s) => s.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM skus WHERE product_id = ${productId} AND is_active = true ORDER BY id
+    `;
+    return skus.mapRows(rows);
   }
 
   async listSkuAliases(skuId: number): Promise<SkuAlias[]> {
-    return (await skuAliases.findByJsonInt('skuId', skuId)).filter((a) => a.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM sku_aliases WHERE sku_id = ${skuId} AND is_active = true ORDER BY id
+    `;
+    return skuAliases.mapRows(rows);
   }
 
   async getCategory(categoryId: number): Promise<Category | undefined> {

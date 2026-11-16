@@ -23,15 +23,24 @@ Login with any 10-digit mobile number - OTPs are mocked and always `123456` (als
 
 By default `frontend/.env` leaves `VITE_API_BASE_URL` empty, so all `/api/*` and `/uploads/*` calls are made **relative to whatever origin the page was loaded from**, and `frontend/vite.config.ts` proxies those paths to the backend (`http://localhost:4000` by default, override with `VITE_API_PROXY_TARGET`). This matters if you're viewing the frontend through a forwarded/tunneled preview URL rather than literally `http://localhost:5173` - hardcoding an absolute `http://localhost:4000` URL would otherwise resolve to *your own machine* from the browser's perspective and fail with "Failed to fetch". Only set `VITE_API_BASE_URL` to an absolute URL if you're serving the frontend separately from this proxy (e.g. a static production build hosted elsewhere) and need to point it at a specific backend host.
 
-## Why mock data?
+## Data layer
 
-`server/src/repositories` defines the data-access **interfaces** the rest of the app depends on (`UserRepository`, `OtpRepository`, `CatalogRepository`, `BuybackRepository`, `PartnerRepository`, `PartnerLocationRepository`, `RoleRepository`, `UserRoleRepository`, `UserLocationHistoryRepository`). The only implementation shipped today is `inMemory/*`, backed by plain JS `Map`s that reset on restart. To move to MySQL:
+`server/src/repositories` defines the data-access **interfaces** the rest of the app depends on. Two drivers:
 
-1. Implement the same interfaces against `mysql2` (or an ORM like Prisma/Kysely).
-2. Flip `DATA_DRIVER=mysql` in `server/.env` and fill in the `DB_*` values.
-3. Wire the new classes into `server/src/repositories/index.ts`.
+| `DATA_DRIVER` | Storage |
+|---|---|
+| `in-memory` (default locally) | JS `Map`s — resets on restart |
+| `postgres` / `supabase` | Normalized Postgres (typed columns + FKs) — see `server/src/db/schema.sql` |
 
-No routes, services, or frontend code need to change - see `server/README.md` for details.
+Production setup:
+
+```bash
+# In server/.env (or Vercel): DATA_DRIVER=postgres, POSTGRES_URL=..., POSTGRES_URL_NON_POOLING=...
+cd server && npm run db:migrate   # WARNING: drops & recreates tables
+cd server && npm run db:seed
+```
+
+The relational schema is reporting-friendly (buybacks, media, answers, pricing, partners/locations/roles) and is the foundation for the upcoming onboarding portal.
 
 ## Product flow implemented
 

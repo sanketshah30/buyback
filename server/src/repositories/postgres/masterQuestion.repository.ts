@@ -1,28 +1,36 @@
+import { getSql } from '../../db/postgres';
 import { MasterQuestion } from '../../types/domain';
 import { MasterQuestionRepository } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity } from './helpers';
 
-const store = new JsonDocStore<MasterQuestion>('master_questions');
+const questions = new EntityTable<MasterQuestion>(
+  'questions',
+  'Master question',
+  (row) => ({ ...mapBaseEntity(row), type: row.type as MasterQuestion['type'] }),
+  (q) => ({ ...baseEntityColumns(q), type: q.type }),
+);
 
 export class PostgresMasterQuestionRepository implements MasterQuestionRepository {
   async create(question: MasterQuestion): Promise<MasterQuestion> {
-    return store.insert(question);
+    return questions.insert(question);
   }
 
   async update(id: number, patch: Partial<MasterQuestion>): Promise<MasterQuestion> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('Master question', id);
-    const updated: MasterQuestion = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return questions.update(id, patch);
   }
 
   async findById(id: number): Promise<MasterQuestion | undefined> {
-    return store.get(id);
+    return questions.get(id);
   }
 
   async list(filter?: { isActive?: boolean }): Promise<MasterQuestion[]> {
-    let result = await store.listAll();
-    if (filter?.isActive !== undefined) result = result.filter((q) => q.isActive === filter.isActive);
-    return result;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM questions
+      WHERE true
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return questions.mapRows(rows);
   }
 }

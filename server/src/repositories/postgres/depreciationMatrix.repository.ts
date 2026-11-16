@@ -1,23 +1,38 @@
+import { getSql } from '../../db/postgres';
 import { DepreciationMatrixEntry } from '../../types/domain';
 import { DepreciationMatrixRepository } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity, toNum } from './helpers';
 
-const store = new JsonDocStore<DepreciationMatrixEntry>('depreciation_matrix');
+const matrix = new EntityTable<DepreciationMatrixEntry>(
+  'depreciation_matrix',
+  'Depreciation matrix entry',
+  (row) => ({
+    ...mapBaseEntity(row),
+    depreciationConfigId: toNum(row.depreciation_config_id),
+    questionAnswerId: toNum(row.question_answer_id),
+    depreciationType: row.depreciation_type as DepreciationMatrixEntry['depreciationType'],
+    depreciationValue: toNum(row.depreciation_value),
+  }),
+  (e) => ({
+    ...baseEntityColumns(e),
+    depreciation_config_id: e.depreciationConfigId,
+    question_answer_id: e.questionAnswerId,
+    depreciation_type: e.depreciationType,
+    depreciation_value: e.depreciationValue,
+  }),
+);
 
 export class PostgresDepreciationMatrixRepository implements DepreciationMatrixRepository {
   async create(entry: DepreciationMatrixEntry): Promise<DepreciationMatrixEntry> {
-    return store.insert(entry);
+    return matrix.insert(entry);
   }
 
   async update(id: number, patch: Partial<DepreciationMatrixEntry>): Promise<DepreciationMatrixEntry> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('Depreciation matrix entry', id);
-    const updated: DepreciationMatrixEntry = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return matrix.update(id, patch);
   }
 
   async findById(id: number): Promise<DepreciationMatrixEntry | undefined> {
-    return store.get(id);
+    return matrix.get(id);
   }
 
   async list(filter?: {
@@ -25,22 +40,29 @@ export class PostgresDepreciationMatrixRepository implements DepreciationMatrixR
     questionAnswerId?: number;
     isActive?: boolean;
   }): Promise<DepreciationMatrixEntry[]> {
-    let result: DepreciationMatrixEntry[];
-    if (filter?.depreciationConfigId !== undefined) {
-      result = await store.findByJsonInt('depreciationConfigId', filter.depreciationConfigId);
-    } else if (filter?.questionAnswerId !== undefined) {
-      result = await store.findByJsonInt('questionAnswerId', filter.questionAnswerId);
-    } else {
-      result = await store.listAll();
-    }
-    if (filter?.questionAnswerId !== undefined) {
-      result = result.filter((e) => e.questionAnswerId === filter.questionAnswerId);
-    }
-    if (filter?.isActive !== undefined) result = result.filter((e) => e.isActive === filter.isActive);
-    return result;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM depreciation_matrix
+      WHERE true
+      ${
+        filter?.depreciationConfigId !== undefined
+          ? sql`AND depreciation_config_id = ${filter.depreciationConfigId}`
+          : sql``
+      }
+      ${filter?.questionAnswerId !== undefined ? sql`AND question_answer_id = ${filter.questionAnswerId}` : sql``}
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return matrix.mapRows(rows);
   }
 
   async listByConfig(depreciationConfigId: number): Promise<DepreciationMatrixEntry[]> {
-    return (await store.findByJsonInt('depreciationConfigId', depreciationConfigId)).filter((e) => e.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM depreciation_matrix
+      WHERE depreciation_config_id = ${depreciationConfigId} AND is_active = true
+      ORDER BY id
+    `;
+    return matrix.mapRows(rows);
   }
 }

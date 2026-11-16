@@ -1,23 +1,38 @@
+import { getSql } from '../../db/postgres';
 import { PartnerMarginConfig } from '../../types/domain';
 import { PartnerMarginConfigRepository } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity, toNum } from './helpers';
 
-const store = new JsonDocStore<PartnerMarginConfig>('partner_margin_configs');
+const configs = new EntityTable<PartnerMarginConfig>(
+  'partner_margin_config',
+  'Partner margin config',
+  (row) => ({
+    ...mapBaseEntity(row),
+    partnerId: toNum(row.partner_id),
+    partnerLocationId: toNum(row.partner_location_id),
+    productCategoryId: toNum(row.product_category_id),
+    marginPercent: toNum(row.margin_percent),
+  }),
+  (c) => ({
+    ...baseEntityColumns(c),
+    partner_id: c.partnerId,
+    partner_location_id: c.partnerLocationId,
+    product_category_id: c.productCategoryId,
+    margin_percent: c.marginPercent,
+  }),
+);
 
 export class PostgresPartnerMarginConfigRepository implements PartnerMarginConfigRepository {
   async create(config: PartnerMarginConfig): Promise<PartnerMarginConfig> {
-    return store.insert(config);
+    return configs.insert(config);
   }
 
   async update(id: number, patch: Partial<PartnerMarginConfig>): Promise<PartnerMarginConfig> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('Partner margin config', id);
-    const updated: PartnerMarginConfig = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return configs.update(id, patch);
   }
 
   async findById(id: number): Promise<PartnerMarginConfig | undefined> {
-    return store.get(id);
+    return configs.get(id);
   }
 
   async findByScope(
@@ -25,13 +40,17 @@ export class PostgresPartnerMarginConfigRepository implements PartnerMarginConfi
     partnerLocationId: number,
     productCategoryId: number,
   ): Promise<PartnerMarginConfig | undefined> {
-    const rows = await store.findByJsonInt('partnerId', partnerId);
-    return rows.find(
-      (c) =>
-        c.isActive &&
-        c.partnerLocationId === partnerLocationId &&
-        c.productCategoryId === productCategoryId,
-    );
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM partner_margin_config
+      WHERE partner_id = ${partnerId}
+        AND partner_location_id = ${partnerLocationId}
+        AND product_category_id = ${productCategoryId}
+        AND is_active = true
+      ORDER BY id
+      LIMIT 1
+    `;
+    return rows[0] ? configs.fromRow(rows[0]) : undefined;
   }
 
   async list(filter?: {
@@ -40,16 +59,17 @@ export class PostgresPartnerMarginConfigRepository implements PartnerMarginConfi
     productCategoryId?: number;
     isActive?: boolean;
   }): Promise<PartnerMarginConfig[]> {
-    let result = await store.listAll();
-    if (filter?.partnerId !== undefined) result = result.filter((c) => c.partnerId === filter.partnerId);
-    if (filter?.partnerLocationId !== undefined) {
-      result = result.filter((c) => c.partnerLocationId === filter.partnerLocationId);
-    }
-    if (filter?.productCategoryId !== undefined) {
-      result = result.filter((c) => c.productCategoryId === filter.productCategoryId);
-    }
-    if (filter?.isActive !== undefined) result = result.filter((c) => c.isActive === filter.isActive);
-    return result;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM partner_margin_config
+      WHERE true
+      ${filter?.partnerId !== undefined ? sql`AND partner_id = ${filter.partnerId}` : sql``}
+      ${filter?.partnerLocationId !== undefined ? sql`AND partner_location_id = ${filter.partnerLocationId}` : sql``}
+      ${filter?.productCategoryId !== undefined ? sql`AND product_category_id = ${filter.productCategoryId}` : sql``}
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return configs.mapRows(rows);
   }
 
   async resolve(

@@ -8,10 +8,30 @@ import {
   QuestionnaireConfig,
 } from '../../types/domain';
 import { QuestionnaireConfigRepository, ResolvedQuestionnaireQuestion } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity, toNum, toNumOrNull } from './helpers';
 
-const store = new JsonDocStore<QuestionnaireConfig>('questionnaire_configs');
 const FALLBACK_LANGUAGE = 'en';
+
+const configs = new EntityTable<QuestionnaireConfig>(
+  'questionnaire_config',
+  'Questionnaire config',
+  (row) => ({
+    ...mapBaseEntity(row),
+    productCategoryId: toNum(row.product_category_id),
+    brandId: toNumOrNull(row.brand_id),
+    partnerId: toNumOrNull(row.partner_id),
+    questionAnswerId: toNum(row.question_answer_id),
+    sequence: toNum(row.sequence),
+  }),
+  (c) => ({
+    ...baseEntityColumns(c),
+    product_category_id: c.productCategoryId,
+    brand_id: c.brandId,
+    partner_id: c.partnerId,
+    question_answer_id: c.questionAnswerId,
+    sequence: c.sequence,
+  }),
+);
 
 function findTranslatedText(
   translations: { language: string; text: string; isActive: boolean }[],
@@ -24,28 +44,17 @@ function findTranslatedText(
   );
 }
 
-function brandKey(brandId: number | null): string {
-  return brandId === null ? 'null' : String(brandId);
-}
-
-function partnerKey(partnerId: number | null): string {
-  return partnerId === null ? 'null' : String(partnerId);
-}
-
 export class PostgresQuestionnaireConfigRepository implements QuestionnaireConfigRepository {
   async create(config: QuestionnaireConfig): Promise<QuestionnaireConfig> {
-    return store.insert(config);
+    return configs.insert(config);
   }
 
   async update(id: number, patch: Partial<QuestionnaireConfig>): Promise<QuestionnaireConfig> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('Questionnaire config', id);
-    const updated: QuestionnaireConfig = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return configs.update(id, patch);
   }
 
   async findById(id: number): Promise<QuestionnaireConfig | undefined> {
-    return store.get(id);
+    return configs.get(id);
   }
 
   async list(filter?: {
@@ -54,14 +63,29 @@ export class PostgresQuestionnaireConfigRepository implements QuestionnaireConfi
     partnerId?: number | null;
     isActive?: boolean;
   }): Promise<QuestionnaireConfig[]> {
-    let result =
-      filter?.productCategoryId !== undefined
-        ? await store.findByJsonInt('productCategoryId', filter.productCategoryId)
-        : await store.listAll();
-    if (filter?.brandId !== undefined) result = result.filter((c) => c.brandId === filter.brandId);
-    if (filter?.partnerId !== undefined) result = result.filter((c) => c.partnerId === filter.partnerId);
-    if (filter?.isActive !== undefined) result = result.filter((c) => c.isActive === filter.isActive);
-    return result;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM questionnaire_config
+      WHERE true
+      ${filter?.productCategoryId !== undefined ? sql`AND product_category_id = ${filter.productCategoryId}` : sql``}
+      ${
+        filter?.brandId === undefined
+          ? sql``
+          : filter.brandId === null
+            ? sql`AND brand_id IS NULL`
+            : sql`AND brand_id = ${filter.brandId}`
+      }
+      ${
+        filter?.partnerId === undefined
+          ? sql``
+          : filter.partnerId === null
+            ? sql`AND partner_id IS NULL`
+            : sql`AND partner_id = ${filter.partnerId}`
+      }
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return configs.mapRows(rows);
   }
 
   async resolve(
@@ -70,24 +94,26 @@ export class PostgresQuestionnaireConfigRepository implements QuestionnaireConfi
     partnerId: number | undefined,
     language: string,
   ): Promise<ResolvedQuestionnaireQuestion[]> {
+    // Most-specific tier first; the first tier with any active rows wins.
     const tiers: { brandId: number | null; partnerId: number | null }[] = [];
     if (brandId !== undefined && partnerId !== undefined) tiers.push({ brandId, partnerId });
     if (partnerId !== undefined) tiers.push({ brandId: null, partnerId });
     if (brandId !== undefined) tiers.push({ brandId, partnerId: null });
     tiers.push({ brandId: null, partnerId: null });
 
-    let matched: QuestionnaireConfig[] = [];
     const sql = getSql();
+    let matched: QuestionnaireConfig[] = [];
     for (const tier of tiers) {
-      const rows = await sql<{ data: QuestionnaireConfig }[]>`
-        SELECT data FROM questionnaire_configs
-        WHERE (data->>'productCategoryId')::bigint = ${productCategoryId}
-          AND COALESCE(data->>'brandId', 'null') = ${brandKey(tier.brandId)}
-          AND COALESCE(data->>'partnerId', 'null') = ${partnerKey(tier.partnerId)}
-          AND (data->>'isActive')::boolean = true
+      const rows = await sql<SqlRow[]>`
+        SELECT * FROM questionnaire_config
+        WHERE product_category_id = ${productCategoryId}
+          AND ${tier.brandId === null ? sql`brand_id IS NULL` : sql`brand_id = ${tier.brandId}`}
+          AND ${tier.partnerId === null ? sql`partner_id IS NULL` : sql`partner_id = ${tier.partnerId}`}
+          AND is_active = true
+        ORDER BY sequence, id
       `;
       if (rows.length > 0) {
-        matched = rows.map((r) => r.data);
+        matched = configs.mapRows(rows);
         break;
       }
     }
@@ -155,47 +181,53 @@ export class PostgresQuestionnaireConfigRepository implements QuestionnaireConfi
   private async loadMappings(ids: number[]): Promise<QuestionAnswerMapping[]> {
     if (ids.length === 0) return [];
     const sql = getSql();
-    const rows = await sql<{ data: QuestionAnswerMapping }[]>`
-      SELECT data FROM question_answer_mappings WHERE id = ANY(${ids})
-    `;
-    return rows.map((r) => r.data);
+    const rows = await sql<SqlRow[]>`SELECT * FROM question_answer_mapping WHERE id = ANY(${ids}::bigint[])`;
+    return rows.map((row) => ({
+      ...mapBaseEntity(row),
+      questionId: toNum(row.question_id),
+      answerId: toNum(row.answer_id),
+    }));
   }
 
   private async loadQuestions(ids: number[]): Promise<MasterQuestion[]> {
     if (ids.length === 0) return [];
     const sql = getSql();
-    const rows = await sql<{ data: MasterQuestion }[]>`
-      SELECT data FROM master_questions WHERE id = ANY(${ids})
-    `;
-    return rows.map((r) => r.data);
+    const rows = await sql<SqlRow[]>`SELECT * FROM questions WHERE id = ANY(${ids}::bigint[])`;
+    return rows.map((row) => ({ ...mapBaseEntity(row), type: row.type as MasterQuestion['type'] }));
   }
 
   private async loadAnswers(ids: number[]): Promise<MasterAnswer[]> {
     if (ids.length === 0) return [];
     const sql = getSql();
-    const rows = await sql<{ data: MasterAnswer }[]>`
-      SELECT data FROM master_answers WHERE id = ANY(${ids})
-    `;
-    return rows.map((r) => r.data);
+    const rows = await sql<SqlRow[]>`SELECT * FROM answers WHERE id = ANY(${ids}::bigint[])`;
+    return rows.map((row) => ({ ...mapBaseEntity(row), code: String(row.code) }));
   }
 
   private async loadQuestionTranslations(questionIds: number[]): Promise<QuestionTranslation[]> {
     if (questionIds.length === 0) return [];
     const sql = getSql();
-    const rows = await sql<{ data: QuestionTranslation }[]>`
-      SELECT data FROM question_translations
-      WHERE (data->>'questionId')::bigint = ANY(${questionIds})
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM question_translations WHERE question_id = ANY(${questionIds}::bigint[]) ORDER BY id
     `;
-    return rows.map((r) => r.data);
+    return rows.map((row) => ({
+      ...mapBaseEntity(row),
+      questionId: toNum(row.question_id),
+      language: String(row.language),
+      text: String(row.text),
+    }));
   }
 
   private async loadAnswerTranslations(answerIds: number[]): Promise<AnswerTranslation[]> {
     if (answerIds.length === 0) return [];
     const sql = getSql();
-    const rows = await sql<{ data: AnswerTranslation }[]>`
-      SELECT data FROM answer_translations
-      WHERE (data->>'answerId')::bigint = ANY(${answerIds})
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM answer_translations WHERE answer_id = ANY(${answerIds}::bigint[]) ORDER BY id
     `;
-    return rows.map((r) => r.data);
+    return rows.map((row) => ({
+      ...mapBaseEntity(row),
+      answerId: toNum(row.answer_id),
+      language: String(row.language),
+      text: String(row.text),
+    }));
   }
 }

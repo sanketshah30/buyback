@@ -1,23 +1,36 @@
+import { getSql } from '../../db/postgres';
 import { PartnerCategoryVendorMapping } from '../../types/domain';
 import { PartnerCategoryVendorMappingRepository } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import { EntityTable, SqlRow, baseEntityColumns, mapBaseEntity, toNum } from './helpers';
 
-const store = new JsonDocStore<PartnerCategoryVendorMapping>('partner_category_vendor_mappings');
+const mappings = new EntityTable<PartnerCategoryVendorMapping>(
+  'partner_category_vendor_mapping',
+  'Partner category vendor mapping',
+  (row) => ({
+    ...mapBaseEntity(row),
+    partnerLocationId: toNum(row.partner_location_id),
+    productCategoryId: toNum(row.product_category_id),
+    vendorId: toNum(row.vendor_id),
+  }),
+  (m) => ({
+    ...baseEntityColumns(m),
+    partner_location_id: m.partnerLocationId,
+    product_category_id: m.productCategoryId,
+    vendor_id: m.vendorId,
+  }),
+);
 
 export class PostgresPartnerCategoryVendorMappingRepository implements PartnerCategoryVendorMappingRepository {
   async create(mapping: PartnerCategoryVendorMapping): Promise<PartnerCategoryVendorMapping> {
-    return store.insert(mapping);
+    return mappings.insert(mapping);
   }
 
   async update(id: number, patch: Partial<PartnerCategoryVendorMapping>): Promise<PartnerCategoryVendorMapping> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('Partner category vendor mapping', id);
-    const updated: PartnerCategoryVendorMapping = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return mappings.update(id, patch);
   }
 
   async findById(id: number): Promise<PartnerCategoryVendorMapping | undefined> {
-    return store.get(id);
+    return mappings.get(id);
   }
 
   async list(filter?: {
@@ -26,31 +39,28 @@ export class PostgresPartnerCategoryVendorMappingRepository implements PartnerCa
     vendorId?: number;
     isActive?: boolean;
   }): Promise<PartnerCategoryVendorMapping[]> {
-    let result: PartnerCategoryVendorMapping[];
-    if (filter?.partnerLocationId !== undefined && filter?.productCategoryId !== undefined) {
-      result = await store.findByJsonIntPair(
-        'partnerLocationId',
-        filter.partnerLocationId,
-        'productCategoryId',
-        filter.productCategoryId,
-      );
-    } else if (filter?.partnerLocationId !== undefined) {
-      result = await store.findByJsonInt('partnerLocationId', filter.partnerLocationId);
-    } else if (filter?.productCategoryId !== undefined) {
-      result = await store.findByJsonInt('productCategoryId', filter.productCategoryId);
-    } else if (filter?.vendorId !== undefined) {
-      result = await store.findByJsonInt('vendorId', filter.vendorId);
-    } else {
-      result = await store.listAll();
-    }
-    if (filter?.vendorId !== undefined) result = result.filter((m) => m.vendorId === filter.vendorId);
-    if (filter?.isActive !== undefined) result = result.filter((m) => m.isActive === filter.isActive);
-    return result;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM partner_category_vendor_mapping
+      WHERE true
+      ${filter?.partnerLocationId !== undefined ? sql`AND partner_location_id = ${filter.partnerLocationId}` : sql``}
+      ${filter?.productCategoryId !== undefined ? sql`AND product_category_id = ${filter.productCategoryId}` : sql``}
+      ${filter?.vendorId !== undefined ? sql`AND vendor_id = ${filter.vendorId}` : sql``}
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return mappings.mapRows(rows);
   }
 
   async listVendorsFor(partnerLocationId: number, productCategoryId: number): Promise<PartnerCategoryVendorMapping[]> {
-    return (
-      await store.findByJsonIntPair('partnerLocationId', partnerLocationId, 'productCategoryId', productCategoryId)
-    ).filter((m) => m.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM partner_category_vendor_mapping
+      WHERE partner_location_id = ${partnerLocationId}
+        AND product_category_id = ${productCategoryId}
+        AND is_active = true
+      ORDER BY id
+    `;
+    return mappings.mapRows(rows);
   }
 }

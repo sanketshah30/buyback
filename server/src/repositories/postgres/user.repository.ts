@@ -1,25 +1,62 @@
+import { getSql } from '../../db/postgres';
 import { User } from '../../types/domain';
 import { allocateId } from '../../utils/idGenerator';
 import { UserRepository } from '../interfaces';
-import { JsonDocStore, nowIso, notFound } from './jsonDocStore';
+import {
+  EntityTable,
+  SqlRow,
+  baseEntityColumns,
+  mapBaseEntity,
+  nowIso,
+  toNumOrUndefined,
+  toStrOrUndefined,
+} from './helpers';
 
-const store = new JsonDocStore<User>('users');
+function fromRow(row: SqlRow): User {
+  return {
+    ...mapBaseEntity(row),
+    mobile: String(row.mobile),
+    name: toStrOrUndefined(row.name),
+    username: toStrOrUndefined(row.username),
+    email: toStrOrUndefined(row.email),
+    partnerLocationId: toNumOrUndefined(row.partner_location_id),
+  };
+}
+
+function toRow(user: User): SqlRow {
+  return {
+    ...baseEntityColumns(user),
+    mobile: user.mobile,
+    name: user.name,
+    username: user.username,
+    email: user.email,
+    partner_location_id: user.partnerLocationId,
+  };
+}
+
+const users = new EntityTable<User>('users', 'User', fromRow, toRow);
 
 export class PostgresUserRepository implements UserRepository {
   async findByMobile(mobile: string): Promise<User | undefined> {
-    return store.findByJsonText('mobile', mobile);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`SELECT * FROM users WHERE mobile = ${mobile} LIMIT 1`;
+    return rows[0] ? fromRow(rows[0]) : undefined;
   }
 
   async findById(id: number): Promise<User | undefined> {
-    return store.get(id);
+    return users.get(id);
   }
 
   async findByUsername(username: string): Promise<User | undefined> {
-    return store.findByJsonText('username', username);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`SELECT * FROM users WHERE username = ${username} LIMIT 1`;
+    return rows[0] ? fromRow(rows[0]) : undefined;
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    return store.findByJsonText('email', email);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`SELECT * FROM users WHERE email = ${email} LIMIT 1`;
+    return rows[0] ? fromRow(rows[0]) : undefined;
   }
 
   async create(
@@ -35,26 +72,31 @@ export class PostgresUserRepository implements UserRepository {
       isActive: true,
       ...extra,
     };
-    return store.insert(user);
+    return users.insert(user);
   }
 
   async update(id: number, patch: Partial<User>): Promise<User> {
-    const existing = await store.get(id);
-    if (!existing) throw notFound('User', id);
-    const updated: User = { ...existing, ...patch, id: existing.id, updatedAt: nowIso() };
-    return store.replace(id, updated);
+    return users.update(id, patch);
   }
 
   async listByLocation(partnerLocationId: number): Promise<User[]> {
-    const rows = await store.findByJsonInt('partnerLocationId', partnerLocationId);
-    return rows.filter((u) => u.isActive);
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM users
+      WHERE partner_location_id = ${partnerLocationId} AND is_active = true
+      ORDER BY id
+    `;
+    return users.mapRows(rows);
   }
 
   async list(filter?: { isActive?: boolean }): Promise<User[]> {
-    let users = await store.listAll();
-    if (filter?.isActive !== undefined) {
-      users = users.filter((u) => u.isActive === filter.isActive);
-    }
-    return users;
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM users
+      WHERE true
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return users.mapRows(rows);
   }
 }
