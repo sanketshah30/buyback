@@ -151,4 +151,76 @@ export interface Role {
   id: number;
   name: string;
   rights: string[];
+  isActive?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Admin onboarding portal entities (mirrors server/src/types/domain.ts)
+// ---------------------------------------------------------------------------
+
+export type PartnerType = 'vendor' | 'retailer';
+
+export interface Partner extends BaseEntity {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  partnerType: PartnerType;
+  uniqueIdentifier: string;
+  email?: string;
+}
+
+export interface PartnerLocation extends BaseEntity {
+  partnerId: number;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  uniqueIdentifier: string;
+  email?: string;
+}
+
+/** Staff user as returned by the admin /api/users endpoints (the `User` type above is the slimmer login-session shape). */
+export interface AdminUser extends BaseEntity {
+  mobile: string;
+  name?: string;
+  username?: string;
+  email?: string;
+  partnerLocationId?: number;
+}
+
+export interface SkuPricing extends BaseEntity {
+  vendorId: number;
+  skuId: number;
+  price: number;
+  validFrom: string;
+  validTo?: string;
+  uploadedById: number;
+}
+
+export interface DepreciationConfig extends BaseEntity {
+  productCategoryId: number;
+  brandId: number;
+  vendorId: number | null;
+  validFrom: string;
+  validTo?: string;
+  uploadedById: number;
+}
+
+export type DepreciationType = 'percentage' | 'absolute';
+
+export interface DepreciationMatrixEntry extends BaseEntity {
+  depreciationConfigId: number;
+  questionAnswerId: number;
+  depreciationType: DepreciationType;
+  depreciationValue: number;
+}
+
+export interface QuestionAnswerMapping extends BaseEntity {
+  questionId: number;
+  answerId: number;
 }

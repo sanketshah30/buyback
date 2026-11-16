@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import { catalogRepository, skuPricingRepository, partnerRepository, userRepository } from '../repositories';
 import { SkuPricing } from '../types/domain';
 import { allocateId } from '../utils/idGenerator';
+import { requireBodyId } from '../utils/httpError';
 import { parseId } from '../utils/parseId';
 
 export const skuPricingRouter = Router();
 skuPricingRouter.use(requireAuth);
+skuPricingRouter.use(requireRight('manage_pricing'));
 
 // List/search and the "resolve" lookup are POST + body, never GET + query
 // string - see server/README.md.
@@ -86,6 +89,45 @@ skuPricingRouter.post('/', async (req: AuthedRequest, res, next) => {
     };
     await skuPricingRepository.create(pricing);
     return res.status(201).json(pricing);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Body-based get/update: the id travels in the JSON body, never the URL.
+skuPricingRouter.post('/get', async (req, res, next) => {
+  try {
+    const pricing = await skuPricingRepository.findById(requireBodyId(req.body));
+    if (!pricing) return res.status(404).json({ error: 'SKU pricing not found' });
+    return res.json(pricing);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+skuPricingRouter.post('/update', async (req, res, next) => {
+  try {
+    const id = requireBodyId(req.body);
+    const existing = await skuPricingRepository.findById(id);
+    if (!existing) return res.status(404).json({ error: 'SKU pricing not found' });
+
+    const { price, validFrom, validTo, isActive } = req.body as {
+      price?: number;
+      validFrom?: string;
+      validTo?: string | null;
+      isActive?: boolean;
+    };
+    if (price !== undefined && (typeof price !== 'number' || Number.isNaN(price) || price < 0)) {
+      return res.status(400).json({ error: 'price must be a non-negative number' });
+    }
+
+    const updated = await skuPricingRepository.update(id, {
+      price,
+      validFrom,
+      validTo: validTo === null ? undefined : validTo,
+      isActive,
+    });
+    return res.json(updated);
   } catch (err) {
     return next(err);
   }

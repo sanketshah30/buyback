@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isAdminUser } from '../lib/adminRights';
 import { Banner } from '../components/ui/Banner';
 import { Button } from '../components/ui/Button';
 import { PageShell } from '../components/ui/PageShell';
@@ -51,7 +52,9 @@ export function LoginPage() {
         partnerLocationId: response.partnerLocationId,
         roles: response.roles,
       });
-      navigate('/', { replace: true });
+      // `hasRight` from useAuth() still reflects the pre-login session here, so check the fresh roles directly.
+      const goesToAdmin = isAdminUser((right) => response.roles.some((role) => role.rights.includes(right)));
+      navigate(goesToAdmin ? '/admin' : '/', { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
     } finally {

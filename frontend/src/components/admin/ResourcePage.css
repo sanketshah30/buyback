@@ -1,0 +1,70 @@
+.resource-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1200px;
+}
+
+.resource-page__toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.resource-page__toolbar h1 {
+  font-size: 1.6rem;
+}
+
+.resource-page__btn.btn {
+  padding: 7px 14px;
+  font-size: 0.85rem;
+}
+
+.resource-page__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.resource-page__icon-btn:hover:not(:disabled) {
+  color: var(--color-gold);
+  background: transparent;
+}
+
+.resource-page__icon-btn--danger:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.resource-page__icon-btn--restore:hover:not(:disabled) {
+  color: var(--color-success);
+}
+
+.resource-page__icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.resource-page__icon-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: resource-page-spin 0.7s linear infinite;
+}
+
+@keyframes resource-page-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { AuthedRequest, requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import { catalogRepository, depreciationConfigRepository, depreciationMatrixRepository, partnerRepository, userRepository } from '../repositories';
 import { depreciationService, DepreciationEntryInput } from '../services/depreciation.service';
+import { requireBodyId } from '../utils/httpError';
 import { parseId } from '../utils/parseId';
 
 export const depreciationConfigRouter = Router();
 depreciationConfigRouter.use(requireAuth);
+depreciationConfigRouter.use(requireRight('manage_pricing'));
 
 // List/search and the "resolve" lookup are POST + body, never GET + query
 // string - see server/README.md.
@@ -86,6 +89,34 @@ depreciationConfigRouter.post('/', async (req: AuthedRequest, res, next) => {
 
     const result = await depreciationService.upload(productCategoryId, brandId, vendorId ?? null, entries, uploadedById);
     return res.status(201).json(result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Body-based get/update: the id travels in the JSON body, never the URL.
+depreciationConfigRouter.post('/get', async (req, res, next) => {
+  try {
+    const config = await depreciationConfigRepository.findById(requireBodyId(req.body));
+    if (!config) return res.status(404).json({ error: 'Depreciation config not found' });
+    return res.json(config);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+depreciationConfigRouter.post('/update', async (req, res, next) => {
+  try {
+    const id = requireBodyId(req.body);
+    const existing = await depreciationConfigRepository.findById(id);
+    if (!existing) return res.status(404).json({ error: 'Depreciation config not found' });
+
+    const { validTo, isActive } = req.body as { validTo?: string | null; isActive?: boolean };
+    const updated = await depreciationConfigRepository.update(id, {
+      validTo: validTo === null ? undefined : validTo,
+      isActive,
+    });
+    return res.json(updated);
   } catch (err) {
     return next(err);
   }

@@ -103,7 +103,15 @@ export const roles: Role[] = [
   {
     id: 1,
     name: 'Super Admin',
-    rights: ['manage_partners', 'manage_locations', 'manage_users', 'manage_roles', 'view_reports'],
+    rights: [
+      'manage_partners',
+      'manage_locations',
+      'manage_users',
+      'manage_roles',
+      'manage_catalog',
+      'manage_pricing',
+      'view_reports',
+    ],
     ...audit,
   },
   {

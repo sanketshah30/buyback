@@ -107,6 +107,93 @@ export class PostgresCatalogRepository implements CatalogRepository {
     return skuAliases.mapRows(rows);
   }
 
+  async searchCategories(filter?: { isActive?: boolean }): Promise<Category[]> {
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM categories
+      WHERE true
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return categories.mapRows(rows);
+  }
+
+  async createCategory(category: Category): Promise<Category> {
+    return categories.insert(category);
+  }
+
+  async updateCategory(id: number, patch: Partial<Category>): Promise<Category> {
+    return categories.update(id, patch);
+  }
+
+  async searchBrands(filter?: { isActive?: boolean }): Promise<Brand[]> {
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM brands
+      WHERE true
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return brands.mapRows(rows);
+  }
+
+  async createBrand(brand: Brand): Promise<Brand> {
+    return brands.insert(brand);
+  }
+
+  async updateBrand(id: number, patch: Partial<Brand>): Promise<Brand> {
+    return brands.update(id, patch);
+  }
+
+  async searchProducts(filter?: { categoryId?: number; brandId?: number; isActive?: boolean }): Promise<Product[]> {
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM products
+      WHERE true
+      ${filter?.categoryId !== undefined ? sql`AND category_id = ${filter.categoryId}` : sql``}
+      ${filter?.brandId !== undefined ? sql`AND brand_id = ${filter.brandId}` : sql``}
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return products.mapRows(rows);
+  }
+
+  async createProduct(product: Product): Promise<Product> {
+    return products.insert(product);
+  }
+
+  async updateProduct(id: number, patch: Partial<Product>): Promise<Product> {
+    return products.update(id, patch);
+  }
+
+  async searchSkus(filter?: { productId?: number; isActive?: boolean }): Promise<Sku[]> {
+    const sql = getSql();
+    const rows = await sql<SqlRow[]>`
+      SELECT * FROM skus
+      WHERE true
+      ${filter?.productId !== undefined ? sql`AND product_id = ${filter.productId}` : sql``}
+      ${filter?.isActive !== undefined ? sql`AND is_active = ${filter.isActive}` : sql``}
+      ORDER BY id
+    `;
+    return skus.mapRows(rows);
+  }
+
+  async createSku(sku: Sku): Promise<Sku> {
+    return skus.insert(sku);
+  }
+
+  async updateSku(id: number, patch: Partial<Sku>): Promise<Sku> {
+    return skus.update(id, patch);
+  }
+
+  async findCategoryById(id: number): Promise<Category | undefined> {
+    return categories.get(id);
+  }
+
+  async findBrandById(id: number): Promise<Brand | undefined> {
+    return brands.get(id);
+  }
+
   async getCategory(categoryId: number): Promise<Category | undefined> {
     const row = await categories.get(categoryId);
     return row?.isActive ? row : undefined;

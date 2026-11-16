@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import { partnerRepository } from '../repositories';
 import { Partner, PartnerType } from '../types/domain';
+import { requireBodyId } from '../utils/httpError';
 import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const partnersRouter = Router();
 partnersRouter.use(requireAuth);
+partnersRouter.use(requireRight('manage_partners'));
 
 const PARTNER_TYPES: PartnerType[] = ['vendor', 'retailer'];
 
@@ -65,6 +68,40 @@ partnersRouter.post('/', async (req, res, next) => {
     };
     await partnerRepository.create(partner);
     return res.status(201).json(partner);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Body-based get/update: the id travels in the JSON body, never the URL.
+partnersRouter.post('/get', async (req, res, next) => {
+  try {
+    const partner = await partnerRepository.findById(requireBodyId(req.body));
+    if (!partner) return res.status(404).json({ error: 'Partner not found' });
+    return res.json(partner);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+partnersRouter.post('/update', async (req, res, next) => {
+  try {
+    const id = requireBodyId(req.body);
+    const existing = await partnerRepository.findById(id);
+    if (!existing) return res.status(404).json({ error: 'Partner not found' });
+
+    const body = req.body as Partial<Partner>;
+    if (body.partnerType && !PARTNER_TYPES.includes(body.partnerType)) {
+      return res.status(400).json({ error: `partnerType must be one of: ${PARTNER_TYPES.join(', ')}` });
+    }
+    if (body.uniqueIdentifier && body.uniqueIdentifier !== existing.uniqueIdentifier) {
+      const clash = await partnerRepository.findByUniqueIdentifier(body.uniqueIdentifier);
+      if (clash) return res.status(409).json({ error: `A partner with uniqueIdentifier "${body.uniqueIdentifier}" already exists` });
+    }
+
+    const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...patch } = body;
+    const updated = await partnerRepository.update(id, patch);
+    return res.json(updated);
   } catch (err) {
     return next(err);
   }

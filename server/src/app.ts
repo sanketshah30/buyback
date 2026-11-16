@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
+import { adminCatalogRouter } from './routes/adminCatalog.routes';
 import { authRouter } from './routes/auth.routes';
 import { buybackRouter } from './routes/buyback.routes';
 import { catalogRouter } from './routes/catalog.routes';
@@ -43,6 +44,8 @@ export function createApp() {
 
   app.use('/api/auth', authRouter);
   app.use('/api/catalog', catalogRouter);
+  // Admin catalog management (categories/brands/products/SKUs) - requires manage_catalog.
+  app.use('/api/admin/catalog', adminCatalogRouter);
   app.use('/api/buyback', buybackRouter);
   // Partner/vendor onboarding hierarchy: Partner -> Partner Location -> User -> Role.
   app.use('/api/partners', partnersRouter);

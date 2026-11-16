@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import {
   partnerLocationRepository,
   roleRepository,
@@ -7,16 +8,19 @@ import {
   userRepository,
   userRoleRepository,
 } from '../repositories';
+import { requireBodyId } from '../utils/httpError';
 import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const usersRouter = Router();
 usersRouter.use(requireAuth);
 
+const manageUsers = requireRight('manage_users');
+
 const MOBILE_REGEX = /^[0-9]{10}$/;
 
 // List/search is POST + body, never GET + query string - see server/README.md.
-usersRouter.post('/search', async (req, res, next) => {
+usersRouter.post('/search', manageUsers, async (req, res, next) => {
   try {
     const partnerLocationId = parseId(req.body?.partnerLocationId);
     const { isActive } = req.body as { isActive?: boolean };
@@ -37,7 +41,7 @@ usersRouter.post('/search', async (req, res, next) => {
  * place with the onboarding details rather than erroring, since a user and
  * their mobile+OTP login identity are the same record either way.
  */
-usersRouter.post('/', async (req, res, next) => {
+usersRouter.post('/', manageUsers, async (req, res, next) => {
   try {
     const { mobile, username, email, name, roleIds } = req.body as {
       mobile?: string;
@@ -51,13 +55,15 @@ usersRouter.post('/', async (req, res, next) => {
     if (!mobile || !MOBILE_REGEX.test(mobile)) {
       return res.status(400).json({ error: 'A valid 10-digit mobile number is required' });
     }
-    if (req.body?.partnerLocationId !== undefined && partnerLocationId === undefined) {
+    if (req.body?.partnerLocationId === undefined || req.body?.partnerLocationId === null) {
+      return res.status(400).json({ error: 'partnerLocationId is required' });
+    }
+    if (partnerLocationId === undefined) {
       return res.status(400).json({ error: 'partnerLocationId must be a valid integer id' });
     }
-    if (partnerLocationId !== undefined) {
-      const location = await partnerLocationRepository.findById(partnerLocationId);
-      if (!location) return res.status(404).json({ error: 'Unknown partnerLocationId' });
-    }
+    const location = await partnerLocationRepository.findById(partnerLocationId);
+    if (!location) return res.status(404).json({ error: 'Unknown partnerLocationId' });
+    if (!location.isActive) return res.status(400).json({ error: 'partnerLocationId refers to an inactive location' });
     if (username) {
       const clash = await userRepository.findByUsername(username);
       if (clash && clash.mobile !== mobile) {
@@ -117,7 +123,77 @@ usersRouter.post('/', async (req, res, next) => {
   }
 });
 
-usersRouter.get('/:id', async (req, res, next) => {
+// Body-based get/update: the id travels in the JSON body, never the URL.
+usersRouter.post('/get', manageUsers, async (req, res, next) => {
+  try {
+    const user = await userRepository.findById(requireBodyId(req.body));
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    return res.json(user);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+usersRouter.post('/update', manageUsers, async (req, res, next) => {
+  try {
+    const id = requireBodyId(req.body);
+    const existing = await userRepository.findById(id);
+    if (!existing) return res.status(404).json({ error: 'User not found' });
+
+    const { username, email, name, isActive } = req.body as {
+      username?: string;
+      email?: string;
+      name?: string;
+      isActive?: boolean;
+    };
+    const partnerLocationId =
+      req.body?.partnerLocationId !== undefined ? parseId(req.body.partnerLocationId) : undefined;
+    if (req.body?.partnerLocationId !== undefined && partnerLocationId === undefined) {
+      return res.status(400).json({ error: 'partnerLocationId must be a valid integer id' });
+    }
+    if (partnerLocationId !== undefined) {
+      const location = await partnerLocationRepository.findById(partnerLocationId);
+      if (!location || !location.isActive) {
+        return res.status(404).json({ error: 'Unknown or inactive partnerLocationId' });
+      }
+    }
+    if (username) {
+      const clash = await userRepository.findByUsername(username);
+      if (clash && clash.id !== existing.id) return res.status(409).json({ error: `Username "${username}" is already taken` });
+    }
+    if (email) {
+      const clash = await userRepository.findByEmail(email);
+      if (clash && clash.id !== existing.id) return res.status(409).json({ error: `Email "${email}" is already in use` });
+    }
+
+    const previousLocationId = existing.partnerLocationId;
+    const updated = await userRepository.update(id, {
+      username,
+      email,
+      name,
+      isActive,
+      ...(partnerLocationId !== undefined ? { partnerLocationId } : {}),
+    });
+
+    if (partnerLocationId !== undefined && partnerLocationId !== previousLocationId) {
+      await userLocationHistoryRepository.record({
+        id: await allocateId('user_location_history'),
+        userId: updated.id,
+        fromPartnerLocationId: previousLocationId,
+        toPartnerLocationId: partnerLocationId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isActive: true,
+      });
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+usersRouter.get('/:id', manageUsers, async (req, res, next) => {
   try {
     const id = parseId(req.params.id);
     const user = id !== undefined ? await userRepository.findById(id) : undefined;
@@ -128,7 +204,7 @@ usersRouter.get('/:id', async (req, res, next) => {
   }
 });
 
-usersRouter.patch('/:id', async (req, res, next) => {
+usersRouter.patch('/:id', manageUsers, async (req, res, next) => {
   try {
     const id = parseId(req.params.id);
     const existing = id !== undefined ? await userRepository.findById(id) : undefined;

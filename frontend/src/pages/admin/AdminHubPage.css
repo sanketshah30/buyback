@@ -1,0 +1,60 @@
+.admin-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 1100px;
+}
+
+.admin-hub h1 {
+  font-size: 1.8rem;
+  margin-bottom: 6px;
+}
+
+.admin-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.admin-hub__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-hub__card h2 {
+  color: var(--color-gold-soft);
+  font-size: 1.2rem;
+}
+
+.admin-hub__card ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-hub__card a {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin-hub__card a:hover {
+  color: var(--color-gold);
+}
+
+.admin-hub__card--locked {
+  opacity: 0.55;
+}
+
+.admin-hub__locked {
+  font-size: 0.85rem;
+}

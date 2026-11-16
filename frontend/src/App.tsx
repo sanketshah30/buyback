@@ -19,6 +19,19 @@ import { DocumentProofPage } from './pages/buyback/DocumentProofPage';
 import { ReviewPage } from './pages/buyback/ReviewPage';
 import { SuccessPage } from './pages/buyback/SuccessPage';
 import { ReceiptPage } from './pages/buyback/ReceiptPage';
+import { AdminRoute } from './components/admin/AdminRoute';
+import { AdminShell } from './components/admin/AdminShell';
+import { AdminHubPage } from './pages/admin/AdminHubPage';
+import { CategoriesPage } from './pages/admin/CategoriesPage';
+import { BrandsPage } from './pages/admin/BrandsPage';
+import { ProductsPage } from './pages/admin/ProductsPage';
+import { SkusPage } from './pages/admin/SkusPage';
+import { PartnersPage } from './pages/admin/PartnersPage';
+import { PartnerLocationsPage } from './pages/admin/PartnerLocationsPage';
+import { UsersPage } from './pages/admin/UsersPage';
+import { SkuPricingPage } from './pages/admin/SkuPricingPage';
+import { DepreciationConfigsPage } from './pages/admin/DepreciationConfigsPage';
+import { DepreciationMatrixPage } from './pages/admin/DepreciationMatrixPage';
 
 function App() {
   return (
@@ -162,6 +175,35 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Admin onboarding portal. No resource ids in URLs - records are edited in a drawer. */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminShell />
+                </AdminRoute>
+              }
+            >
+              <Route index element={<AdminHubPage />} />
+              <Route path="catalog/categories" element={<AdminRoute rights={['manage_catalog']}><CategoriesPage /></AdminRoute>} />
+              <Route path="catalog/brands" element={<AdminRoute rights={['manage_catalog']}><BrandsPage /></AdminRoute>} />
+              <Route path="catalog/products" element={<AdminRoute rights={['manage_catalog']}><ProductsPage /></AdminRoute>} />
+              <Route path="catalog/skus" element={<AdminRoute rights={['manage_catalog']}><SkusPage /></AdminRoute>} />
+              <Route path="partners" element={<AdminRoute rights={['manage_partners']}><PartnersPage /></AdminRoute>} />
+              <Route path="locations" element={<AdminRoute rights={['manage_locations']}><PartnerLocationsPage /></AdminRoute>} />
+              <Route path="users" element={<AdminRoute rights={['manage_users']}><UsersPage /></AdminRoute>} />
+              <Route path="pricing/sku" element={<AdminRoute rights={['manage_pricing']}><SkuPricingPage /></AdminRoute>} />
+              <Route
+                path="pricing/depreciation-configs"
+                element={<AdminRoute rights={['manage_pricing']}><DepreciationConfigsPage /></AdminRoute>}
+              />
+              <Route
+                path="pricing/depreciation-matrix"
+                element={<AdminRoute rights={['manage_pricing']}><DepreciationMatrixPage /></AdminRoute>}
+              />
+              <Route path="*" element={<Navigate to="/admin" replace />} />
+            </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

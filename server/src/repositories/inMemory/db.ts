@@ -1,4 +1,4 @@
-import { products, skuAliases, skus } from '../../data/catalog.seed';
+import { brands, categories, products, skuAliases, skus } from '../../data/catalog.seed';
 import { depreciationConfigs, depreciationMatrix } from '../../data/depreciation.seed';
 import { partnerLocations, partners, roles } from '../../data/partner.seed';
 import {
@@ -15,9 +15,11 @@ import { users, userRoles as seededUserRoles } from '../../data/user.seed';
 import { partnerCategoryVendorMappings, skuPricing } from '../../data/vendorPricing.seed';
 import {
   AnswerTranslation,
+  Brand,
   BuybackRequest,
   BuybackStatusHistory,
   BuybackVendorCalculationLog,
+  Category,
   DepreciationConfig,
   DepreciationMatrixEntry,
   MasterAnswer,
@@ -69,6 +71,8 @@ export const tables = {
   buybackRequests: new Map<number, BuybackRequest>(),
   dailySequences: new Map<string, number>(), // dateKey -> last count (business display-ID counter, not a table)
 
+  categories: new Map<number, Category>(categories.map((c) => [c.id, c])),
+  brands: new Map<number, Brand>(brands.map((b) => [b.id, b])),
   products: new Map<number, Product>(products.map((p) => [p.id, p])),
   skus: new Map<number, Sku>(skus.map((s) => [s.id, s])),
   skuAliases: new Map<number, SkuAlias>(skuAliases.map((a) => [a.id, a])),

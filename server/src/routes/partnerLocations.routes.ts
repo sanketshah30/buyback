@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import { partnerLocationRepository, partnerRepository } from '../repositories';
 import { PartnerLocation } from '../types/domain';
+import { requireBodyId } from '../utils/httpError';
 import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
 export const partnerLocationsRouter = Router();
 partnerLocationsRouter.use(requireAuth);
+partnerLocationsRouter.use(requireRight('manage_locations'));
 
 function validateLocationBody(body: { partnerId?: number } & Partial<PartnerLocation>): string | null {
   if (!body.partnerId) return 'partnerId is required';
@@ -44,6 +47,7 @@ partnerLocationsRouter.post('/', async (req, res, next) => {
 
     const partner = await partnerRepository.findById(partnerId!);
     if (!partner) return res.status(404).json({ error: 'Unknown partnerId' });
+    if (!partner.isActive) return res.status(400).json({ error: 'partnerId refers to an inactive partner' });
 
     const existing = await partnerLocationRepository.findByUniqueIdentifier(body.uniqueIdentifier!);
     if (existing) {
@@ -68,6 +72,45 @@ partnerLocationsRouter.post('/', async (req, res, next) => {
     };
     await partnerLocationRepository.create(location);
     return res.status(201).json(location);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Body-based get/update: the id travels in the JSON body, never the URL.
+partnerLocationsRouter.post('/get', async (req, res, next) => {
+  try {
+    const location = await partnerLocationRepository.findById(requireBodyId(req.body));
+    if (!location) return res.status(404).json({ error: 'Partner location not found' });
+    return res.json(location);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+partnerLocationsRouter.post('/update', async (req, res, next) => {
+  try {
+    const id = requireBodyId(req.body);
+    const existing = await partnerLocationRepository.findById(id);
+    if (!existing) return res.status(404).json({ error: 'Partner location not found' });
+
+    const partnerId = parseId(req.body?.partnerId);
+    if (!partnerId) return res.status(400).json({ error: 'partnerId is required' });
+    const partner = await partnerRepository.findById(partnerId);
+    if (!partner) return res.status(404).json({ error: 'Unknown partnerId' });
+    if (partnerId !== existing.partnerId && !partner.isActive) {
+      return res.status(400).json({ error: 'partnerId refers to an inactive partner' });
+    }
+
+    const body = req.body as Partial<PartnerLocation>;
+    if (body.uniqueIdentifier && body.uniqueIdentifier !== existing.uniqueIdentifier) {
+      const clash = await partnerLocationRepository.findByUniqueIdentifier(body.uniqueIdentifier);
+      if (clash) return res.status(409).json({ error: `A location with uniqueIdentifier "${body.uniqueIdentifier}" already exists` });
+    }
+
+    const { id: _ignoredId, createdAt: _ignoredCreatedAt, partnerId: _ignoredPartnerId, ...rest } = body;
+    const updated = await partnerLocationRepository.update(id, { ...rest, partnerId });
+    return res.json(updated);
   } catch (err) {
     return next(err);
   }

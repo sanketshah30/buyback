@@ -4,6 +4,7 @@ import { Banner } from '../components/ui/Banner';
 import { Card } from '../components/ui/Card';
 import { PageShell } from '../components/ui/PageShell';
 import { Spinner } from '../components/ui/Spinner';
+import { isAdminUser } from '../lib/adminRights';
 import { useAuth } from '../lib/auth';
 import { buybackApi } from '../lib/buybackApi';
 import { useBuybackDraft } from '../lib/buybackDraft';
@@ -38,7 +39,7 @@ const RESUME_ROUTE: Record<string, (id: string) => string> = {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, hasRight } = useAuth();
   const { reset: resetDraft } = useBuybackDraft();
   const [history, setHistory] = useState<BuybackRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +79,15 @@ export function DashboardPage() {
         </div>
         <span className="dashboard-cta__arrow">→</span>
       </Card>
+
+      {isAdminUser(hasRight) && (
+        <Card interactive onClick={() => navigate('/admin')} className="dashboard-history-link">
+          <h2>Admin portal</h2>
+          <span className="dashboard-cta__arrow" aria-hidden>
+            →
+          </span>
+        </Card>
+      )}
 
       {loading && <Spinner label="Loading your requests…" />}
       {error && <Banner tone="error">{error}</Banner>}

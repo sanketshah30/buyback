@@ -69,16 +69,32 @@ export interface SessionRepository {
 
 export interface CatalogRepository {
   listCategories(): Promise<Category[]>;
+  /** Admin list — includes inactive when `isActive` is omitted. */
+  searchCategories(filter?: { isActive?: boolean }): Promise<Category[]>;
+  createCategory(category: Category): Promise<Category>;
+  updateCategory(id: number, patch: Partial<Category>): Promise<Category>;
   /** Brands are standalone (see types/domain.ts); this derives the distinct
    * brands that have at least one active product listed under this category -
    * the equivalent of `SELECT DISTINCT b.* FROM brands b JOIN products p ON
    * p.brand_id = b.id WHERE p.category_id = ? AND p.is_active`. */
   listBrandsByCategory(categoryId: number): Promise<Brand[]>;
+  searchBrands(filter?: { isActive?: boolean }): Promise<Brand[]>;
+  createBrand(brand: Brand): Promise<Brand>;
+  updateBrand(id: number, patch: Partial<Brand>): Promise<Brand>;
   listProducts(categoryId: number, brandId: number): Promise<Product[]>;
+  searchProducts(filter?: { categoryId?: number; brandId?: number; isActive?: boolean }): Promise<Product[]>;
+  createProduct(product: Product): Promise<Product>;
+  updateProduct(id: number, patch: Partial<Product>): Promise<Product>;
   listSkus(productId: number): Promise<Sku[]>;
+  searchSkus(filter?: { productId?: number; isActive?: boolean }): Promise<Sku[]>;
+  createSku(sku: Sku): Promise<Sku>;
+  updateSku(id: number, patch: Partial<Sku>): Promise<Sku>;
   listSkuAliases(skuId: number): Promise<SkuAlias[]>;
   getCategory(categoryId: number): Promise<Category | undefined>;
+  /** Like getCategory but returns inactive rows too (admin get-by-id). */
+  findCategoryById(id: number): Promise<Category | undefined>;
   getBrand(brandId: number): Promise<Brand | undefined>;
+  findBrandById(id: number): Promise<Brand | undefined>;
   getProduct(productId: number): Promise<Product | undefined>;
   getSku(skuId: number): Promise<Sku | undefined>;
 }

@@ -13,9 +13,10 @@ interface SelectProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  error?: string;
 }
 
-export function Select({ label, options, value, onChange, placeholder = 'Select an option', disabled = false }: SelectProps) {
+export function Select({ label, options, value, onChange, placeholder = 'Select an option', disabled = false, error }: SelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
@@ -82,6 +83,7 @@ export function Select({ label, options, value, onChange, placeholder = 'Select 
           ))}
         </ul>
       )}
+      {error && <span className="select-field__error">{error}</span>}
     </div>
   );
 }

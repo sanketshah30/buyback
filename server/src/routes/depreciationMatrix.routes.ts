@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import { depreciationConfigRepository, depreciationMatrixRepository, questionAnswerMappingRepository } from '../repositories';
 import { DepreciationMatrixEntry } from '../types/domain';
 import { allocateId } from '../utils/idGenerator';
+import { requireBodyId } from '../utils/httpError';
 import { parseId } from '../utils/parseId';
 
 export const depreciationMatrixRouter = Router();
 depreciationMatrixRouter.use(requireAuth);
+depreciationMatrixRouter.use(requireRight('manage_pricing'));
 
 const DEPRECIATION_TYPES = ['percentage', 'absolute'] as const;
 
@@ -71,6 +74,51 @@ depreciationMatrixRouter.post('/', async (req, res, next) => {
     };
     await depreciationMatrixRepository.create(entry);
     return res.status(201).json(entry);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Body-based get/update: the id travels in the JSON body, never the URL.
+depreciationMatrixRouter.post('/get', async (req, res, next) => {
+  try {
+    const entry = await depreciationMatrixRepository.findById(requireBodyId(req.body));
+    if (!entry) return res.status(404).json({ error: 'Depreciation matrix entry not found' });
+    return res.json(entry);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+depreciationMatrixRouter.post('/update', async (req, res, next) => {
+  try {
+    const id = requireBodyId(req.body);
+    const existing = await depreciationMatrixRepository.findById(id);
+    if (!existing) return res.status(404).json({ error: 'Depreciation matrix entry not found' });
+
+    const { depreciationType, depreciationValue, isActive } = req.body as {
+      depreciationType?: string;
+      depreciationValue?: number;
+      isActive?: boolean;
+    };
+    if (depreciationType !== undefined && !DEPRECIATION_TYPES.includes(depreciationType as (typeof DEPRECIATION_TYPES)[number])) {
+      return res.status(400).json({ error: `depreciationType must be one of: ${DEPRECIATION_TYPES.join(', ')}` });
+    }
+    if (depreciationValue !== undefined && (typeof depreciationValue !== 'number' || Number.isNaN(depreciationValue) || depreciationValue < 0)) {
+      return res.status(400).json({ error: 'depreciationValue must be a non-negative number' });
+    }
+    const effectiveType = (depreciationType as 'percentage' | 'absolute' | undefined) ?? existing.depreciationType;
+    const effectiveValue = depreciationValue ?? existing.depreciationValue;
+    if (effectiveType === 'percentage' && effectiveValue > 100) {
+      return res.status(400).json({ error: 'depreciationValue for a "percentage" entry cannot exceed 100' });
+    }
+
+    const updated = await depreciationMatrixRepository.update(id, {
+      depreciationType: depreciationType as 'percentage' | 'absolute' | undefined,
+      depreciationValue,
+      isActive,
+    });
+    return res.json(updated);
   } catch (err) {
     return next(err);
   }
