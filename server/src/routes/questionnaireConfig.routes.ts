@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { requireRight } from '../middleware/rights.middleware';
 import {
   catalogRepository,
   partnerRepository,
@@ -7,6 +8,7 @@ import {
   questionnaireConfigRepository,
 } from '../repositories';
 import { QuestionnaireConfig } from '../types/domain';
+import { requireBodyId } from '../utils/httpError';
 import { allocateId } from '../utils/idGenerator';
 import { parseId } from '../utils/parseId';
 
@@ -14,14 +16,8 @@ export const questionnaireConfigRouter = Router();
 questionnaireConfigRouter.use(requireAuth);
 
 /**
- * The main capability this module exists for: given the product category
- * (required) and optional brand/partner the app is currently showing, return
- * the applicable questionnaire - already resolved to the single most
- * specific matching tier and sorted by sequence. See
- * QuestionnaireConfigRepository.resolve() for the precedence rules.
- *
- * POST + body (not GET + query string) per the module-wide convention -
- * see server/README.md.
+ * Live buyback flow lookup - any authenticated user (promoters included).
+ * POST + body per server/README.md.
  */
 questionnaireConfigRouter.post('/resolve', async (req, res, next) => {
   try {
@@ -36,24 +32,33 @@ questionnaireConfigRouter.post('/resolve', async (req, res, next) => {
     const category = await catalogRepository.getCategory(productCategoryId);
     if (!category) return res.status(404).json({ error: 'Unknown productCategoryId' });
 
-    const questions = await questionnaireConfigRepository.resolve(productCategoryId, brandId, partnerId, language || 'en');
+    const questions = await questionnaireConfigRepository.resolve(
+      productCategoryId,
+      brandId,
+      partnerId,
+      language || 'en',
+    );
     return res.json({ productCategoryId, brandId: brandId ?? null, partnerId: partnerId ?? null, questions });
   } catch (err) {
     return next(err);
   }
 });
 
-// List/search is POST + body, never GET + query string.
-questionnaireConfigRouter.post('/search', async (req, res, next) => {
+const admin = Router();
+admin.use(requireRight('manage_pricing'));
+
+admin.post('/search', async (req, res, next) => {
   try {
     const productCategoryId = req.body?.productCategoryId !== undefined ? parseId(req.body.productCategoryId) : undefined;
-    const brandId = req.body?.brandId !== undefined ? (req.body.brandId === null ? null : parseId(req.body.brandId)) : undefined;
-    const partnerId = req.body?.partnerId !== undefined ? (req.body.partnerId === null ? null : parseId(req.body.partnerId)) : undefined;
+    const brandId =
+      req.body?.brandId !== undefined ? (req.body.brandId === null ? null : parseId(req.body.brandId)) : undefined;
+    const partnerId =
+      req.body?.partnerId !== undefined ? (req.body.partnerId === null ? null : parseId(req.body.partnerId)) : undefined;
     const { isActive } = req.body as { isActive?: boolean };
     const configs = await questionnaireConfigRepository.list({
       productCategoryId,
-      brandId: brandId ?? undefined,
-      partnerId: partnerId ?? undefined,
+      brandId,
+      partnerId,
       isActive,
     });
     return res.json(configs);
@@ -62,17 +67,20 @@ questionnaireConfigRouter.post('/search', async (req, res, next) => {
   }
 });
 
-questionnaireConfigRouter.post('/', async (req, res, next) => {
+admin.post('/', async (req, res, next) => {
   try {
     const productCategoryId = parseId(req.body?.productCategoryId);
     const brandId = req.body?.brandId !== undefined && req.body?.brandId !== null ? parseId(req.body.brandId) : undefined;
-    const partnerId = req.body?.partnerId !== undefined && req.body?.partnerId !== null ? parseId(req.body.partnerId) : undefined;
+    const partnerId =
+      req.body?.partnerId !== undefined && req.body?.partnerId !== null ? parseId(req.body.partnerId) : undefined;
     const questionAnswerId = parseId(req.body?.questionAnswerId);
     const { sequence } = req.body as { sequence?: number };
 
     if (!productCategoryId) return res.status(400).json({ error: 'productCategoryId is required and cannot be 0/null' });
     if (!questionAnswerId) return res.status(400).json({ error: 'questionAnswerId is required' });
-    if (sequence === undefined || sequence === null) return res.status(400).json({ error: 'sequence is required' });
+    if (sequence === undefined || sequence === null || Number.isNaN(Number(sequence))) {
+      return res.status(400).json({ error: 'sequence is required' });
+    }
 
     const category = await catalogRepository.getCategory(productCategoryId);
     if (!category) return res.status(404).json({ error: 'Unknown productCategoryId' });
@@ -94,7 +102,7 @@ questionnaireConfigRouter.post('/', async (req, res, next) => {
       brandId: brandId ?? null,
       partnerId: partnerId ?? null,
       questionAnswerId,
-      sequence,
+      sequence: Number(sequence),
       createdAt: now,
       updatedAt: now,
       isActive: true,
@@ -106,10 +114,9 @@ questionnaireConfigRouter.post('/', async (req, res, next) => {
   }
 });
 
-questionnaireConfigRouter.get('/:id', async (req, res, next) => {
+admin.post('/get', async (req, res, next) => {
   try {
-    const id = parseId(req.params.id);
-    const config = id !== undefined ? await questionnaireConfigRepository.findById(id) : undefined;
+    const config = await questionnaireConfigRepository.findById(requireBodyId(req.body));
     if (!config) return res.status(404).json({ error: 'Questionnaire config not found' });
     return res.json(config);
   } catch (err) {
@@ -117,16 +124,21 @@ questionnaireConfigRouter.get('/:id', async (req, res, next) => {
   }
 });
 
-questionnaireConfigRouter.patch('/:id', async (req, res, next) => {
+admin.post('/update', async (req, res, next) => {
   try {
-    const id = parseId(req.params.id);
-    const existing = id !== undefined ? await questionnaireConfigRepository.findById(id) : undefined;
-    if (!existing || id === undefined) return res.status(404).json({ error: 'Questionnaire config not found' });
+    const id = requireBodyId(req.body);
+    const existing = await questionnaireConfigRepository.findById(id);
+    if (!existing) return res.status(404).json({ error: 'Questionnaire config not found' });
 
     const { sequence, isActive } = req.body as { sequence?: number; isActive?: boolean };
+    if (sequence !== undefined && (typeof sequence !== 'number' || Number.isNaN(sequence))) {
+      return res.status(400).json({ error: 'sequence must be a number' });
+    }
     const updated = await questionnaireConfigRepository.update(id, { sequence, isActive });
     return res.json(updated);
   } catch (err) {
     return next(err);
   }
 });
+
+questionnaireConfigRouter.use(admin);

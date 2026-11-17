@@ -7,11 +7,15 @@ import type {
   DepreciationMatrixEntry,
   DepreciationType,
   DeviceCategoryType,
+  MasterAnswer,
+  MasterQuestion,
   Partner,
   PartnerLocation,
   PartnerType,
   Product,
   QuestionAnswerMapping,
+  QuestionnaireConfig,
+  QuestionType,
   Role,
   Sku,
   SkuPricing,
@@ -129,12 +133,33 @@ export const rolesApi = {
 
 // ---- Pricing (manage_pricing) ----------------------------------------------
 
-export const skuPricingApi = standardResource<
+const skuPricingBase = standardResource<
   SkuPricing,
-  SearchFilter & { vendorId?: number; skuId?: number },
+  SearchFilter & { vendorId?: number; skuId?: number; validFrom?: string; validTo?: string },
   { vendorId: number; skuId: number; price: number; validFrom: string; validTo?: string },
   { price?: number; validFrom?: string; validTo?: string | null; isActive?: boolean }
 >('/api/sku-pricing');
+
+export interface SkuPricingBulkRow {
+  skuCode?: string;
+  skuId?: number;
+  price: number;
+  validFrom: string;
+  validTo?: string | null;
+}
+
+export interface SkuPricingBulkResult {
+  created: number;
+  failed: number;
+  errors: { line: number; error: string }[];
+  rows: SkuPricing[];
+}
+
+export const skuPricingApi = {
+  ...skuPricingBase,
+  bulk: (vendorId: number, rows: SkuPricingBulkRow[]) =>
+    api.post<SkuPricingBulkResult>('/api/sku-pricing/bulk', { vendorId, rows }),
+};
 
 export interface DepreciationEntryInput {
   questionAnswerId: number;
@@ -156,8 +181,38 @@ export const depreciationMatrixApi = standardResource<
   { depreciationType?: DepreciationType; depreciationValue?: number; isActive?: boolean }
 >('/api/depreciation-matrix');
 
-// ---- Lookups ---------------------------------------------------------------
+// ---- Questionnaire (manage_pricing) ----------------------------------------
 
-export const questionAnswersApi = {
-  search: (filter: SearchFilter = {}) => api.post<QuestionAnswerMapping[]>('/api/question-answers/search', filter),
-};
+export const questionsApi = standardResource<
+  MasterQuestion,
+  SearchFilter,
+  { type: QuestionType; text: string },
+  { type?: QuestionType; text?: string; isActive?: boolean }
+>('/api/questions');
+
+export const answersApi = standardResource<
+  MasterAnswer,
+  SearchFilter,
+  { code: string; text: string },
+  { code?: string; text?: string; isActive?: boolean }
+>('/api/answers');
+
+export const questionAnswersApi = standardResource<
+  QuestionAnswerMapping,
+  SearchFilter & { questionId?: number },
+  { questionId: number; answerId: number },
+  { isActive?: boolean }
+>('/api/question-answers');
+
+export const questionnaireConfigApi = standardResource<
+  QuestionnaireConfig,
+  SearchFilter & { productCategoryId?: number; brandId?: number | null; partnerId?: number | null },
+  {
+    productCategoryId: number;
+    brandId?: number | null;
+    partnerId?: number | null;
+    questionAnswerId: number;
+    sequence: number;
+  },
+  { sequence?: number; isActive?: boolean }
+>('/api/questionnaire-config');

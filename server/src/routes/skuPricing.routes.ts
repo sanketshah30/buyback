@@ -17,9 +17,114 @@ skuPricingRouter.post('/search', async (req, res, next) => {
   try {
     const vendorId = req.body?.vendorId !== undefined ? parseId(req.body.vendorId) : undefined;
     const skuId = req.body?.skuId !== undefined ? parseId(req.body.skuId) : undefined;
-    const { isActive } = req.body as { isActive?: boolean };
-    const pricing = await skuPricingRepository.list({ vendorId, skuId, isActive });
+    const { isActive, validFrom, validTo } = req.body as {
+      isActive?: boolean;
+      validFrom?: string;
+      validTo?: string;
+    };
+    let pricing = await skuPricingRepository.list({ vendorId, skuId, isActive });
+
+    // Optional validity-window filters (inclusive overlap with [validFrom, validTo]).
+    if (typeof validFrom === 'string' && validFrom.trim()) {
+      const fromMs = new Date(validFrom).getTime();
+      pricing = pricing.filter((p) => {
+        const toMs = p.validTo ? new Date(p.validTo).getTime() : undefined;
+        return toMs === undefined || toMs >= fromMs;
+      });
+    }
+    if (typeof validTo === 'string' && validTo.trim()) {
+      const toMs = new Date(validTo).getTime();
+      pricing = pricing.filter((p) => new Date(p.validFrom).getTime() <= toMs);
+    }
+
     return res.json(pricing);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+/**
+ * Bulk create prices for one vendor. Each row resolves SKU by `skuCode` (or skuId).
+ * Blank/null validTo = open-ended (stored as null).
+ * Body: { vendorId, rows: [{ skuCode?, skuId?, price, validFrom, validTo? }] }
+ */
+skuPricingRouter.post('/bulk', async (req: AuthedRequest, res, next) => {
+  try {
+    const vendorId = parseId(req.body?.vendorId);
+    const uploadedById = req.auth?.userId;
+    const rows = Array.isArray(req.body?.rows) ? (req.body.rows as Record<string, unknown>[]) : null;
+
+    if (!vendorId) return res.status(400).json({ error: 'vendorId is required' });
+    if (!uploadedById) return res.status(401).json({ error: 'Not authenticated' });
+    if (!rows || rows.length === 0) return res.status(400).json({ error: 'rows must be a non-empty array' });
+
+    const vendor = await partnerRepository.findById(vendorId);
+    if (!vendor || !vendor.isActive || vendor.partnerType !== 'vendor') {
+      return res.status(404).json({ error: 'Unknown or inactive vendorId' });
+    }
+
+    const skus = await catalogRepository.searchSkus({ isActive: true });
+    const skuByCode = new Map(skus.map((s) => [s.code.trim().toLowerCase(), s]));
+
+    const created: SkuPricing[] = [];
+    const errors: { line: number; error: string }[] = [];
+    const now = new Date().toISOString();
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const line = i + 1;
+      const row = rows[i];
+      const skuId = row.skuId !== undefined ? parseId(row.skuId) : undefined;
+      const skuCode = typeof row.skuCode === 'string' ? row.skuCode.trim() : '';
+      const price = typeof row.price === 'number' ? row.price : Number(row.price);
+      const validFrom = typeof row.validFrom === 'string' ? row.validFrom.trim() : '';
+      const validToRaw = row.validTo;
+      const validTo =
+        validToRaw === null || validToRaw === undefined || validToRaw === ''
+          ? undefined
+          : String(validToRaw).trim() || undefined;
+
+      let resolvedSkuId = skuId;
+      if (!resolvedSkuId && skuCode) {
+        resolvedSkuId = skuByCode.get(skuCode.toLowerCase())?.id;
+      }
+      if (!resolvedSkuId) {
+        errors.push({ line, error: skuCode ? `Unknown skuCode "${skuCode}"` : 'skuCode or skuId is required' });
+        continue;
+      }
+      if (Number.isNaN(price) || price < 0) {
+        errors.push({ line, error: 'price must be a non-negative number' });
+        continue;
+      }
+      if (!validFrom) {
+        errors.push({ line, error: 'validFrom is required' });
+        continue;
+      }
+      if (validTo && new Date(validTo).getTime() <= new Date(validFrom).getTime()) {
+        errors.push({ line, error: 'validTo must be after validFrom' });
+        continue;
+      }
+
+      const pricing: SkuPricing = {
+        id: await allocateId('sku_pricing'),
+        vendorId,
+        skuId: resolvedSkuId,
+        price,
+        validFrom: new Date(validFrom).toISOString(),
+        validTo: validTo ? new Date(validTo).toISOString() : undefined,
+        uploadedById,
+        createdAt: now,
+        updatedAt: now,
+        isActive: true,
+      };
+      created.push(await skuPricingRepository.create(pricing));
+    }
+
+    return res.status(created.length > 0 ? 201 : 400).json({
+      created: created.length,
+      failed: errors.length,
+      errors,
+      rows: created,
+    });
   } catch (err) {
     return next(err);
   }

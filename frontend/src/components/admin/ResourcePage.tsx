@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { getAdminErrorMessage } from '../../lib/adminErrors';
 import { Banner } from '../ui/Banner';
 import { Button } from '../ui/Button';
@@ -19,8 +19,8 @@ interface ResourcePageProps<T extends Row> {
   entityName: string;
   columns: Column<T>[];
   load: () => Promise<T[]>;
-  /** Receives the record being edited (null when creating) so select options can include its current, possibly inactive, parents. */
-  fields: (editing: T | null) => FieldDef[];
+  /** Receives the record being edited (null when creating) and current form values so selects can depend on each other. */
+  fields: (editing: T | null, values: FormValues) => FieldDef[];
   emptyValues: FormValues;
   toFormValues: (row: T) => FormValues;
   onCreate: (values: FormValues) => Promise<unknown>;
@@ -33,8 +33,12 @@ interface ResourcePageProps<T extends Row> {
   extraError?: string | null;
   /** Disable "Create" until lookups needed by the form are ready. */
   createDisabled?: boolean;
-  /** Bump to force a reload (e.g. after lookups change). */
-  reloadKey?: number;
+  /** Bump / change to force a reload (e.g. after lookups or filters change). */
+  reloadKey?: number | string;
+  /** Optional controls under the title row (filters, bulk actions). */
+  toolbarExtra?: ReactNode;
+  /** Extra buttons next to Create. */
+  headerActions?: ReactNode;
 }
 
 export function ResourcePage<T extends Row>({
@@ -52,7 +56,9 @@ export function ResourcePage<T extends Row>({
   validate,
   extraError,
   createDisabled = false,
-  reloadKey = 0,
+  reloadKey = 0 as number | string,
+  toolbarExtra,
+  headerActions,
 }: ResourcePageProps<T>) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +74,7 @@ export function ResourcePage<T extends Row>({
   const [submitting, setSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const fieldDefs = fields(editing);
+  const fieldDefs = fields(editing, values);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -182,10 +188,15 @@ export function ResourcePage<T extends Row>({
           <h1>{title}</h1>
           {description && <p>{description}</p>}
         </div>
-        <Button fullWidth={false} onClick={openCreate} disabled={createDisabled}>
-          + Create {entityName}
-        </Button>
+        <div className="resource-page__toolbar-actions">
+          {headerActions}
+          <Button fullWidth={false} onClick={openCreate} disabled={createDisabled}>
+            + Create {capitalize(entityName)}
+          </Button>
+        </div>
       </div>
+
+      {toolbarExtra}
 
       {pageError && <Banner tone="error">{pageError}</Banner>}
       {extraError && <Banner tone="warning">{extraError}</Banner>}
@@ -261,8 +272,8 @@ export function ResourcePage<T extends Row>({
 
       <ResourceDrawer
         open={drawerOpen}
-        title={editing ? `Edit ${entityName}` : `Create ${entityName}`}
-        submitLabel={editing ? 'Save changes' : `Create ${entityName}`}
+        title={editing ? `Edit ${capitalize(entityName)}` : `Create ${capitalize(entityName)}`}
+        submitLabel={editing ? 'Save changes' : `Create ${capitalize(entityName)}`}
         submitting={submitting}
         error={formError}
         onClose={closeDrawer}

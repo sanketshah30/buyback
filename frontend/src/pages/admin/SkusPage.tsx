@@ -16,13 +16,13 @@ export function SkusPage() {
   const fields = (editing: Sku | null): FieldDef[] => [
     {
       key: 'productId',
-      label: 'product_id',
+      label: 'Product',
       kind: 'select',
       required: true,
       options: toOptions(products.items, (p) => `${p.id} — ${p.name}`, editing?.productId),
     },
-    { key: 'code', label: 'code', kind: 'text', required: true },
-    { key: 'label', label: 'label', kind: 'text', required: true },
+    { key: 'code', label: 'SKU', kind: 'text', required: true },
+    { key: 'label', label: 'Label', kind: 'text', required: true },
   ];
 
   return (
@@ -30,7 +30,7 @@ export function SkusPage() {
       title="SKUs"
       entityName="SKU"
       columns={[
-        { key: 'id', header: 'id', render: (r) => r.id },
+        { key: 'id', header: 'ID', render: (r) => r.id },
         { key: 'code', header: 'SKU', render: (r) => r.code },
         { key: 'productId', header: 'Product', render: (r) => productName(r.productId) },
         { key: 'label', header: 'Label', render: (r) => r.label },

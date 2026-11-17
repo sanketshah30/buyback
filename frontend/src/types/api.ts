@@ -220,7 +220,35 @@ export interface DepreciationMatrixEntry extends BaseEntity {
   depreciationValue: number;
 }
 
+export interface MasterQuestion extends BaseEntity {
+  type: QuestionType;
+  /** Prefer English translation from admin search/get. */
+  text?: string;
+}
+
+export interface MasterAnswer extends BaseEntity {
+  code: string;
+  /** Prefer English translation from admin search/get. */
+  text?: string;
+}
+
 export interface QuestionAnswerMapping extends BaseEntity {
   questionId: number;
   answerId: number;
+  /** Present on admin search responses (prefer English translation). */
+  questionText?: string;
+  answerText?: string;
+  answerCode?: string;
+}
+
+/**
+ * Which Q&A options apply for a category (+ optional brand/partner) and in
+ * what order. Null brand/partner = wildcard (applies to all).
+ */
+export interface QuestionnaireConfig extends BaseEntity {
+  productCategoryId: number;
+  brandId: number | null;
+  partnerId: number | null;
+  questionAnswerId: number;
+  sequence: number;
 }

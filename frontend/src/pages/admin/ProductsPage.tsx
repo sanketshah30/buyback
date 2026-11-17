@@ -18,19 +18,19 @@ export function ProductsPage() {
   const fields = (editing: Product | null): FieldDef[] => [
     {
       key: 'categoryId',
-      label: 'category_id',
+      label: 'Category',
       kind: 'select',
       required: true,
       options: toOptions(categories.items, (c) => `${c.id} — ${c.name}`, editing?.categoryId),
     },
     {
       key: 'brandId',
-      label: 'brand_id',
+      label: 'Brand',
       kind: 'select',
       required: true,
       options: toOptions(brands.items, (b) => `${b.id} — ${b.name}`, editing?.brandId),
     },
-    { key: 'name', label: 'name', kind: 'text', required: true },
+    { key: 'name', label: 'Name', kind: 'text', required: true },
   ];
 
   return (
@@ -38,7 +38,7 @@ export function ProductsPage() {
       title="Products"
       entityName="product"
       columns={[
-        { key: 'id', header: 'id', render: (r) => r.id },
+        { key: 'id', header: 'ID', render: (r) => r.id },
         { key: 'name', header: 'Name', render: (r) => r.name },
         { key: 'categoryId', header: 'Category', render: (r) => categoryName(r.categoryId) },
         { key: 'brandId', header: 'Brand', render: (r) => brandName(r.brandId) },

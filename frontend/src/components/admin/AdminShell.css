@@ -7,6 +7,10 @@
   overflow: hidden;
 }
 
+.admin-shell--hub {
+  grid-template-columns: 1fr;
+}
+
 .admin-shell__nav {
   display: flex;
   flex-direction: column;

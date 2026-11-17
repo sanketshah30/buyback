@@ -14,6 +14,3 @@ export function formatDateTime(iso?: string | null): string {
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 }
-
-/** A blank row for the depreciation-config deductions editor. */
-export const EMPTY_ENTRY: Record<string, string> = { questionAnswerId: '', depreciationType: 'percentage', depreciationValue: '' };

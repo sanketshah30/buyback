@@ -10,16 +10,16 @@ import type { Category, DeviceCategoryType } from '../../types/api';
  * (`type` CHECK: smartphone | non-smartphone)
  */
 const FIELDS: FieldDef[] = [
-  { key: 'name', label: 'name', kind: 'text', required: true },
+  { key: 'name', label: 'Name', kind: 'text', required: true },
   {
     key: 'type',
-    label: 'type',
+    label: 'Type',
     kind: 'select',
     required: true,
     hint: 'Stored on categories.type (smartphone | non-smartphone).',
     options: [
-      { value: 'smartphone', label: 'smartphone' },
-      { value: 'non-smartphone', label: 'non-smartphone' },
+      { value: 'smartphone', label: 'Smartphone' },
+      { value: 'non-smartphone', label: 'Non-smartphone' },
     ],
   },
 ];
@@ -30,9 +30,9 @@ export function CategoriesPage() {
       title="Categories"
       entityName="category"
       columns={[
-        { key: 'id', header: 'id', render: (r) => r.id },
-        { key: 'name', header: 'name', render: (r) => r.name },
-        { key: 'type', header: 'type', render: (r) => r.type },
+        { key: 'id', header: 'ID', render: (r) => r.id },
+        { key: 'name', header: 'Name', render: (r) => r.name },
+        { key: 'type', header: 'Type', render: (r) => r.type },
         { key: 'createdAt', header: 'Created At', render: (r) => formatDateTime(r.createdAt) },
       ]}
       load={() => categoriesApi.search()}

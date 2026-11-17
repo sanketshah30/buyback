@@ -19,7 +19,7 @@ export interface AdminNavItem {
 }
 
 export interface AdminNavSection {
-  key: 'product' | 'partner' | 'config';
+  key: 'product' | 'partner' | 'config' | 'questionnaire';
   title: string;
   description: string;
   items: AdminNavItem[];
@@ -53,8 +53,18 @@ export const ADMIN_NAV: AdminNavSection[] = [
     description: 'Vendor SKU pricing and depreciation rules used by the valuation engine.',
     items: [
       { label: 'SKU Pricing', path: '/admin/pricing/sku', right: 'manage_pricing' },
-      { label: 'Depreciation Configs', path: '/admin/pricing/depreciation-configs', right: 'manage_pricing' },
       { label: 'Depreciation Matrix', path: '/admin/pricing/depreciation-matrix', right: 'manage_pricing' },
+    ],
+  },
+  {
+    key: 'questionnaire',
+    title: 'Question Answer Config',
+    description: 'Configure assessment questions, answers, mappings, and which apply per category, brand, and partner.',
+    items: [
+      { label: 'Questions', path: '/admin/pricing/questions', right: 'manage_pricing' },
+      { label: 'Answers', path: '/admin/pricing/answers', right: 'manage_pricing' },
+      { label: 'Question Answers', path: '/admin/pricing/question-answers', right: 'manage_pricing' },
+      { label: 'Questionnaire Config', path: '/admin/pricing/questionnaire-config', right: 'manage_pricing' },
     ],
   },
 ];

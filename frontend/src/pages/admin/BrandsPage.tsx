@@ -8,7 +8,7 @@ import type { Brand } from '../../types/api';
  * Mirrors `brands` table columns:
  * id, name, created_at, is_active
  */
-const FIELDS: FieldDef[] = [{ key: 'name', label: 'name', kind: 'text', required: true }];
+const FIELDS: FieldDef[] = [{ key: 'name', label: 'Name', kind: 'text', required: true }];
 
 export function BrandsPage() {
   return (
@@ -16,8 +16,8 @@ export function BrandsPage() {
       title="Brands"
       entityName="brand"
       columns={[
-        { key: 'id', header: 'id', render: (r) => r.id },
-        { key: 'name', header: 'name', render: (r) => r.name },
+        { key: 'id', header: 'ID', render: (r) => r.id },
+        { key: 'name', header: 'Name', render: (r) => r.name },
         { key: 'createdAt', header: 'Created At', render: (r) => formatDateTime(r.createdAt) },
       ]}
       load={() => brandsApi.search()}

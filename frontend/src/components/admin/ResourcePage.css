@@ -17,6 +17,14 @@
   font-size: 1.6rem;
 }
 
+.resource-page__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .resource-page__btn.btn {
   padding: 7px 14px;
   font-size: 0.85rem;

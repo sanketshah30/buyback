@@ -1,0 +1,16 @@
+.depreciation-matrix-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 900px) {
+  .depreciation-matrix-filters {
+    grid-template-columns: 1fr;
+  }
+}

@@ -30,8 +30,11 @@ import { PartnersPage } from './pages/admin/PartnersPage';
 import { PartnerLocationsPage } from './pages/admin/PartnerLocationsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { SkuPricingPage } from './pages/admin/SkuPricingPage';
-import { DepreciationConfigsPage } from './pages/admin/DepreciationConfigsPage';
 import { DepreciationMatrixPage } from './pages/admin/DepreciationMatrixPage';
+import { QuestionsPage } from './pages/admin/QuestionsPage';
+import { AnswersPage } from './pages/admin/AnswersPage';
+import { QuestionAnswersPage } from './pages/admin/QuestionAnswersPage';
+import { QuestionnaireConfigPage } from './pages/admin/QuestionnaireConfigPage';
 
 function App() {
   return (
@@ -195,12 +198,22 @@ function App() {
               <Route path="users" element={<AdminRoute rights={['manage_users']}><UsersPage /></AdminRoute>} />
               <Route path="pricing/sku" element={<AdminRoute rights={['manage_pricing']}><SkuPricingPage /></AdminRoute>} />
               <Route
-                path="pricing/depreciation-configs"
-                element={<AdminRoute rights={['manage_pricing']}><DepreciationConfigsPage /></AdminRoute>}
-              />
-              <Route
                 path="pricing/depreciation-matrix"
                 element={<AdminRoute rights={['manage_pricing']}><DepreciationMatrixPage /></AdminRoute>}
+              />
+              <Route
+                path="pricing/depreciation-configs"
+                element={<Navigate to="/admin/pricing/depreciation-matrix" replace />}
+              />
+              <Route path="pricing/questions" element={<AdminRoute rights={['manage_pricing']}><QuestionsPage /></AdminRoute>} />
+              <Route path="pricing/answers" element={<AdminRoute rights={['manage_pricing']}><AnswersPage /></AdminRoute>} />
+              <Route
+                path="pricing/question-answers"
+                element={<AdminRoute rights={['manage_pricing']}><QuestionAnswersPage /></AdminRoute>}
+              />
+              <Route
+                path="pricing/questionnaire-config"
+                element={<AdminRoute rights={['manage_pricing']}><QuestionnaireConfigPage /></AdminRoute>}
               />
               <Route path="*" element={<Navigate to="/admin" replace />} />
             </Route>
