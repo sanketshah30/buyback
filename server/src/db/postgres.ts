@@ -12,6 +12,7 @@ function createClient(url: string, max: number): Sql {
     max,
     idle_timeout: 20,
     connect_timeout: 30,
+    prepare: false,
   });
 }
 
